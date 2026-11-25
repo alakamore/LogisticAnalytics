@@ -135,6 +135,14 @@ test('сервисы: в разметке нет захардкоженных в
     }
 });
 
+test('common.js: кнопка «На портал» ведёт в корень сайта, а не на index.html', () => {
+    const commonCode = fs.readFileSync('./shared/js/common.js', 'utf8');
+    assert.ok(commonCode.includes('href="../../" class="btn-back"'),
+        'кнопка назад должна вести в корень сайта');
+    assert.ok(!commonCode.includes('href="../../index.html"'),
+        'кнопка назад не должна открывать index.html');
+});
+
 /* ---------- Service Worker ---------- */
 
 test('sw.js: импортирует единую конфигурацию', () => {

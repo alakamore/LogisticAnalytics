@@ -756,7 +756,7 @@ function renderServiceHeader(el) {
     if (service) document.title = `${service.title} ${formatVersion(service.version)}`;
 
     el.innerHTML = `
-        <a href="../../index.html" class="btn-back" title="На портал" aria-label="На портал">←</a>
+        <a href="../../" class="btn-back" title="На портал" aria-label="На портал">←</a>
         <div class="header-left">
             <h1>${icon}${escapeHtml(d.title || '')}${accent}${version}</h1>
             <p>${escapeHtml(d.subtitle || '')}</p>
