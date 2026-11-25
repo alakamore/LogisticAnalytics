@@ -1,0 +1,1791 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Пополнение Основных Адресов</title>
+    <!-- Общие стили портала -->
+    <link rel="stylesheet" href="../../shared/css/common.css">
+    <!-- Единая конфигурация портала и управление обновлениями PWA -->
+    <script src="../../shared/js/config.js"></script>
+    <script src="../../shared/js/pwa-update.js"></script>
+    <!-- Библиотеки (единые локальные копии в shared/js-lib/) -->
+    <script src="../../shared/js-lib/xlsx.full.min.js"></script>
+    <script src="../../shared/js-lib/chart.umd.min.js"></script>
+    <!-- Общие утилиты и IndexedDB-хранилище -->
+    <script src="../../shared/js/idb.js"></script>
+    <script src="../../shared/js/common.js"></script>
+    <style>
+        /* =====================================================
+           Сервис: Пополнение Основных Адресов - уникальные стили
+           Общее вынесено в shared/css/common.css
+           ===================================================== */
+        :root {
+            --brand-yellow: #FFC107;
+            --brand-dark: #1A1A1A;
+            --brand-grey: #2C2C2C;
+            --text-main: #333333;
+            --text-muted: #757575;
+            --border-color: #E0E0E0;
+            --danger: #D32F2F;
+            --success: #388E3C;
+            --header-bg: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+            --header-2: #2d3748;
+            --brand-primary: #4299e1;
+            --brand-primary-dark: #3182ce;
+            --shadow-color: rgba(0,0,0,0.2);
+            --container-bg: #ffffff;
+            --card-bg: #ffffff;
+            --card-border: #e2e8f0;
+            --section-bg: #f7fafc;
+            --section-bg-2: #edf2f7;
+            --input-bg: #ffffff;
+            --input-border: #cbd5e0;
+            --table-hover: #f7fafc;
+            --table-even: #fafbfc;
+            --title-color: #2d3748;
+            --filter-label-color: #4a5568;
+            --text-muted: #718096;
+            --footer-bg: #f7fafc;
+            --footer-border: #e2e8f0;
+            --btn-clear-bg: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+            --btn-clear-hover: linear-gradient(135deg, #e53e3e 0%, #c53030 100%);
+        }
+
+        body {
+            background: linear-gradient(150deg, #fcdc68 0%, #ffcd17 50%, #ff9f43 100%);
+        }
+
+        /* --- Header (сервисный акцент) --- */
+        .header {
+            background: var(--header-bg);
+            border-bottom: 4px solid var(--brand-yellow);
+            position: relative;
+        }
+        .header-left h1 span { color: var(--brand-yellow); }
+
+        .btn-back {
+            background: rgba(255,255,255,0.15);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        .btn-back:hover {
+            background: rgba(255,255,255,0.25);
+            transform: translateY(-50%) scale(1.05);
+        }
+        .btn-back:active {
+            transform: translateY(-50%) scale(0.95);
+        }
+
+        .header-left {
+            padding-left: 75px;
+        }
+
+        /* --- Upload Section --- */
+        .upload-section {
+            background: linear-gradient(180deg, #f7fafc 0%, #edf2f7 100%);
+        }
+        .upload-area {
+            border-color: #cbd5e0;
+            background: white;
+        }
+        .upload-area:hover {
+            border-color: #4299e1;
+            background: #ebf8ff;
+        }
+        .upload-area.dragover {
+            border-color: #48bb78;
+            background: #f0fff4;
+        }
+
+        /* --- Stats Cards (сервисные варианты) --- */
+        .stat-card {
+            color: #2d3748;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.06);
+            border: 2px solid #715b00;
+            cursor: pointer;
+        }
+        .stat-card.warning { background: linear-gradient(135deg, #9f9afc 0%, #fed7d7 100%);}
+        .stat-card.success { background: linear-gradient(135deg, #f0fff4 0%, #ffc973 100%);}
+        .stat-card.info { background: linear-gradient(135deg, #8bf578 0%, #bee3f8 100%);}
+        .stat-card.neutral { background: linear-gradient(135deg, #f7fafc 0%, #ffff63 100%);}
+        .stat-card.fill30 { background: linear-gradient(135deg, #fff5f5 0%, #fed7d7 100%);}
+        .stat-card.fill60 { background: linear-gradient(135deg, #fffaf0 0%, #feebc8 100%);}
+        .stat-card.fill75 { background: linear-gradient(135deg, #f7fafc 0%, #e2e8f0 100%);}
+
+        /* --- Section Title --- */
+        .top-section { margin-bottom: 25px; }
+
+        /* --- Charts --- */
+        .charts-row {
+            grid-template-columns: repeat(3, 1fr);
+        }
+
+        /* --- Filters --- */
+        .filters-section {
+            margin-bottom: 20px;
+        }
+
+        /* --- Table --- */
+        .negative { color: #e53e3e; font-weight: 700; }
+        .positive { color: #38a169; font-weight: 700; }
+        .zero { color: #a0aec0; }
+
+        /* --- Top Cards --- */
+        .top-cards-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+        }
+        .top-card {
+            background: linear-gradient(135deg, #fff3cd 0%, #fffc9c 100%);
+            border-left: 4px solid #fc8181;
+            padding: 14px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgb(252 208 68 / 15%);
+            border: 1px solid #654200;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            cursor: pointer;
+        }
+        .top-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgb(252 208 68 / 35%);
+            background: linear-gradient(135deg, #fffc9c 0%, #fff3cd 100%);
+        }
+        .top-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .top-card-rank {
+            font-size: 1.4em;
+            font-weight: 700;
+            color: #e53e3e;
+            background: linear-gradient(135deg, #ffffff 0%, #fff5f5 100%);
+            padding: 5px 10px;
+            border-radius: 6px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+        .top-card-lm {
+            font-weight: 600;
+            color: #2d3748;
+            font-size: 0.95em;
+            background: linear-gradient(135deg, #ffffff 0%, #f7fafc 100%);
+            padding: 3px 8px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+        }
+        .top-card-main-address {
+            font-weight: 600;
+            color: #2d3748;
+            font-size: 0.95em;
+            background: linear-gradient(135deg, #ffe600 0%, #fff236 100%);
+            padding: 3px 8px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+        }
+        .top-card-name {
+            color: #718096;
+            font-size: 0.85em;
+            margin-bottom: 10px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .top-card-stats {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .top-card-need {
+            font-size: 1em;
+            font-weight: 600;
+            color: #e53e3e;
+        }
+        .top-card-fill {
+            font-size: 0.85em;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 4px;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+        }
+        .fill-bar {
+            width: 100%;
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 8px 0;
+        }
+        .fill-level {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+        .fill-low { background: linear-gradient(90deg, #fc8181, #f56565); }
+        .fill-medium { background: linear-gradient(90deg, #f6ad55, #ed8936); }
+        .fill-high { background: linear-gradient(90deg, #68d391, #48bb78); }
+        .fill-critical { background: linear-gradient(90deg, #f56565, #e53e3e); }
+        .fill-empty { background: linear-gradient(90deg, #cbd5e0, #a0aec0); }
+        .fill-na { background: #e2e8f0; }
+        .top-card-sources {
+            font-size: 0.75em;
+            color: #4a5568;
+            background: linear-gradient(135deg, #ffffff 0%, #f7fafc 100%);
+            padding: 8px;
+            border-radius: 5px;
+            margin-top: 8px;
+            border: 1px dashed #cbd5e0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .top-card-sources strong { color: #2d3748; }
+
+        .no-max-stock { background: #f7fafc; color: #a0aec0; }
+
+        .replenish-source {
+            background: linear-gradient(135deg, #c6f6d5 0%, #9ae6b4 100%);
+            color: #276749;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75em;
+            display: inline-block;
+            margin: 2px;
+            font-weight: 500;
+            border: 1px solid #9ae6b4;
+            box-shadow: 0 2px 4px rgba(72,187,120,0.2);
+        }
+        .no-source { color: #a0aec0; font-style: italic; font-size: 0.85em; }
+
+        .fill-percent {
+            font-size: 0.75em;
+            font-weight: 700;
+            margin-top: 3px;
+            color: #4a5568;
+        }
+
+        .sscc-badge {
+            background: linear-gradient(135deg, #9f7aea 0%, #805ad5 100%);
+            color: white;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-size: 0.7em;
+            font-weight: 600;
+            margin-left: 5px;
+            box-shadow: 0 2px 4px rgba(128,90,213,0.3);
+        }
+
+        /* --- Heatmap --- */
+        .heatmap-container {
+            overflow-x: auto;
+            padding: 10px;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+        .heatmap-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.75em;
+        }
+        .heatmap-table th, .heatmap-table td {
+            padding: 6px 8px;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+            min-width: 50px;
+        }
+        .heatmap-table th {
+            background: #4a5568;
+            color: white;
+        }
+        .heatmap-cell {
+            border-radius: 4px;
+            font-weight: 600;
+            color: white;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        }
+        .heatmap-0 { background: linear-gradient(135deg, #cbd5e0, #a0aec0); }
+        .heatmap-30 { background: linear-gradient(135deg, #f56565, #e53e3e); }
+        .heatmap-60 { background: linear-gradient(135deg, #f6ad55, #ed8936); }
+        .heatmap-75 { background: linear-gradient(135deg, #f1c40f, #d69e2e); }
+        .heatmap-90 { background: linear-gradient(135deg, #68d391, #48bb78); }
+        .heatmap-100 { background: linear-gradient(135deg, #38a169, #2f855a); }
+
+        /* --- Info / Instruction Modal Content --- */
+        .instruction-section {
+            background: linear-gradient(135deg, #ebf8ff 0%, #f0f9ff 100%);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #90cdf4;
+        }
+        .instruction-section h4 {
+            color: #2c5282;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #bee3f8;
+        }
+        .instruction-steps {
+            list-style: none;
+            counter-reset: step-counter;
+        }
+        .instruction-steps li {
+            position: relative;
+            padding-left: 45px;
+            margin-bottom: 15px;
+            line-height: 1.6;
+            color: #4a5568;
+        }
+        .instruction-steps li::before {
+            counter-increment: step-counter;
+            content: counter(step-counter);
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.9em;
+            box-shadow: 0 2px 6px rgba(66,153,225,0.4);
+        }
+        .instruction-steps li strong {
+            color: #2d3748;
+            display: block;
+            margin-bottom: 4px;
+        }
+        .instruction-steps li code {
+            background: #edf2f7;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.85em;
+            color: #2d3748;
+        }
+        .info-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .info-card {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+        .info-card-icon {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+        .info-card h5 {
+            color: #2d3748;
+            font-size: 0.95em;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        .info-card p {
+            color: #718096;
+            font-size: 0.85em;
+            line-height: 1.5;
+        }
+        .warning-box {
+            background: linear-gradient(135deg, #fff5f5 0%, #fed7d7 100%);
+            border-left: 4px solid #fc8181;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+        .warning-box h5 {
+            color: #c53030;
+            font-size: 0.95em;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .warning-box p {
+            color: #742a2a;
+            font-size: 0.85em;
+            line-height: 1.5;
+        }
+        .modal-card ul {
+            margin-left: 20px;
+            color: #4a5568;
+            font-size: 0.9em;
+        }
+        .modal-card li {
+            margin-bottom: 8px;
+            line-height: 1.5;
+        }
+        .modal-card li strong {
+            color: #2d3748;
+        }
+
+        /* --- Data Notice (сервисный окрас) --- */
+        .data-notice {
+            background: linear-gradient(135deg, #ebf8ff 0%, #bee3f8 100%);
+            border-left: 4px solid #4299e1;
+        }
+
+        /* --- Footer --- */
+        .footer {
+            background: #f7fafc;
+            border-top: 1px solid #e2e8f0;
+        }
+        .footer a {
+            color: #4299e1;
+        }
+        .footer a:hover {
+            color: #2b6cb0;
+        }
+
+        /* --- Filters: чекбокс --- */
+        .filter-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 34px;
+            padding: 0 4px;
+            font-size: 0.78em;
+            font-weight: 600;
+            color: var(--filter-label-color, #4a5568);
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .filter-checkbox input {
+            width: 16px;
+            height: 16px;
+            margin: 0;
+            accent-color: #d69e2e;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .filter-checkbox span { line-height: 1.2; }
+
+        /* --- Zone Select Modal --- */
+        .zone-select-hint {
+            font-size: 0.9em;
+            color: var(--text-muted);
+            margin-bottom: 14px;
+            line-height: 1.5;
+        }
+        .zone-select-total {
+            background: var(--section-bg, #f7fafc);
+            border: 1px solid var(--card-border, #e2e8f0);
+            border-radius: 8px;
+            padding: 10px 14px;
+            margin-bottom: 12px;
+            font-size: 0.88em;
+            color: var(--text-main);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            justify-content: space-between;
+        }
+        .zone-select-total strong { color: var(--title-color); }
+        .zone-select-actions { display: flex; gap: 8px; margin-bottom: 10px; }
+        .zone-select-actions button {
+            padding: 6px 14px;
+            font-size: 0.8em;
+            background: #d69e2e;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        .zone-select-actions button:hover { background: #b7791f; }
+        .zone-select-actions button.reset { background: #a0aec0; }
+        .zone-select-actions button.reset:hover { background: #718096; }
+        .zone-select-list {
+            max-height: 260px;
+            overflow-y: auto;
+            border: 1px solid var(--card-border, #e2e8f0);
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+        .zone-select-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 14px;
+            border-bottom: 1px solid var(--card-border, #e2e8f0);
+            cursor: pointer;
+            font-size: 0.9em;
+            color: var(--text-main);
+            transition: background 0.1s;
+        }
+        .zone-select-item:last-child { border-bottom: none; }
+        .zone-select-item:hover { background: var(--table-hover); }
+        .zone-select-item input { accent-color: #d69e2e; width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; }
+        .zone-select-name { font-weight: 600; flex: 1; }
+        .zone-select-meta { color: var(--text-muted); font-size: 0.85em; white-space: nowrap; }
+        .zone-select-summary {
+            font-size: 0.85em;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+        .zone-select-summary strong { color: var(--title-color); }
+        .zone-modal-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            margin-bottom: 12px;
+            border: 1px solid #f6e05e;
+            border-radius: 8px;
+            background: #fffff0;
+            font-size: 0.88em;
+            color: var(--text-main);
+            cursor: pointer;
+        }
+        .zone-modal-option input { width: 16px; height: 16px; accent-color: #d69e2e; cursor: pointer; flex-shrink: 0; }
+        .zone-select-footer {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            padding-top: 10px;
+            border-top: 1px solid var(--card-border, #e2e8f0);
+        }
+        .zone-select-footer .btn { margin: 0; }
+
+        /* --- Responsive overrides --- */
+        @media (max-width: 1800px) {
+            .top-cards-grid { grid-template-columns: repeat(4, 1fr); }
+        }
+        @media (max-width: 1400px) {
+            .charts-row { grid-template-columns: repeat(2, 1fr); }
+            .top-cards-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 1200px) {
+            .charts-row { grid-template-columns: repeat(2, 1fr); }
+            .top-cards-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 768px) {
+            .header { flex-direction: column; text-align: center; gap: 15px; }
+            .info-btn { position: relative; top: auto; right: auto; margin: 10px auto; }
+            .charts-row { grid-template-columns: 1fr; }
+            .filters-section { flex-direction: column; align-items: stretch; }
+            .filters-left, .filters-right { flex-direction: column; align-items: stretch; }
+            .filter-group { min-width: 100%; }
+            .filter-checkbox { min-height: 28px; white-space: normal; }
+            .btn { width: 100%; }
+            .zone-select-footer { flex-direction: column; }
+            .zone-select-footer .btn { width: 100%; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .top-cards-grid { grid-template-columns: 1fr; }
+            .data-notice { flex-direction: column; text-align: center; }
+            .instruction-steps li { padding-left: 40px; }
+            .instruction-steps li::before { width: 28px; height: 28px; font-size: 0.8em; }
+            .info-cards { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 480px) {
+            .stats-grid { grid-template-columns: 1fr; }
+            .top-cards-grid { grid-template-columns: 1fr !important; }
+            .priority-name { white-space: normal; }
+            table th, table td { padding: 6px 8px; font-size: 0.8em; }
+            .chart-container { min-height: 240px; padding: 14px; }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header" data-service-header data-icon="📋" data-title="Пополнение" data-accent="Основных Адресов" data-version-service="restock"
+            data-subtitle="Анализ потребности пополнения основных адресов из других мест хранения"></div>
+
+        <!-- Data Persistence Notice -->
+        <div class="data-notice" id="dataNotice">
+            <div class="data-notice-text">
+                <strong id="noticeTitle">💾 Данные сохранены!</strong>
+                <span id="dataInfo">Загружено артикулов: 0 | Дата: </span>
+            </div>
+            <button class="btn btn-clear" onclick="requestClearData(null, doClearRestock)" style="padding: 8px 16px; margin: 0;">🗑️ Очистить</button>
+        </div>
+
+        <div class="upload-section" id="uploadSection">
+            <div class="upload-area" id="uploadArea" role="button" tabindex="0" aria-label="Загрузить файл">
+                <div class="upload-icon">📂</div>
+                <div class="upload-text">Перетащите файл RESTOCKING.xlsx сюда</div>
+                <div class="upload-hint">или кликните для выбора файла • .xlsx, .xls</div>
+                <input type="file" id="fileInput" accept=".xlsx,.xls" aria-label="Выбор файла">
+            </div>
+        </div>
+
+        <div class="loading" id="loading" aria-live="polite">
+            <div class="spinner"></div>
+            <p id="loadingText">Обработка данных...</p>
+        </div>
+
+        <div class="dashboard" id="dashboard">
+            <div class="stats-grid" id="statsGrid"></div>
+
+            <div class="top-section">
+                <div class="chart-container" style="height: auto;">
+                    <div class="chart-title">🔴 Топ-10 товаров с наибольшей потребностью в пополнении</div>
+                    <div class="top-cards-grid" id="topProductsCards"></div>
+                </div>
+            </div>
+
+            <div class="charts-row">
+                <div class="chart-container">
+                    <div class="chart-title">📦 Распределение по отделам</div>
+                    <div style="flex: 1; position: relative; min-height: 0;">
+                        <canvas id="departmentChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-title">📊 Наполненность основных адресов</div>
+                    <div style="flex: 1; position: relative; min-height: 0;">
+                        <canvas id="fillChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-title">🗺️ Распределение по зонам</div>
+                    <div class="heatmap-container" id="heatmapContainer"></div>
+                </div>
+            </div>
+
+            <div class="filters-section">
+                <div class="filters-left">
+                    <div class="filter-group">
+                        <label for="searchInput">🔍 Поиск по артикулу (ЛМ)</label>
+                        <input type="text" id="searchInput" placeholder="Введите артикул...">
+                    </div>
+                    <div class="filter-group">
+                        <label for="departmentFilter">📦 Отдел</label>
+                        <select id="departmentFilter"><option value="">Все отделы</option></select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="zoneFilter">📍 Зона</label>
+                        <select id="zoneFilter"><option value="">Все зоны</option></select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="fillFilter">📊 Наполненность</label>
+                        <select id="fillFilter">
+                            <option value="">Все</option>
+                            <option value="0">0% (Пусто)</option>
+                            <option value="0-30">Меньше 30%</option>
+                            <option value="0-60">Меньше 60%</option>
+                            <option value="0-75">Меньше 75%</option>
+                            <option value="0-90">Меньше 90%</option>
+                            <option value="100+">100%+ (Избыток)</option>
+                        </select>
+                    </div>
+                    <label class="filter-checkbox" id="excludeNoMaxGroup" for="excludeNoMax">
+                        <input type="checkbox" id="excludeNoMax">
+                        <span>Исключить без макс. запаса</span>
+                    </label>
+                    <div class="filter-group" style="min-width:auto;">
+                        <label>&nbsp;</label>
+                        <button class="btn btn-reset" onclick="resetFilters()">Сброс</button>
+                    </div>
+                </div>
+                <div class="filters-right">
+                    <button class="btn btn-export" onclick="exportRestockToXLSX()">📥 Экспорт в XLSX</button>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table id="dataTable" role="table">
+                    <thead>
+                        <tr>
+                            <th data-sort-col="Основной адрес" onclick="sortTable('Основной адрес')" role="columnheader">🏠 Основной Адрес <span class="sort-indicator">⬍</span></th>
+                            <th data-sort-col="Отдел" onclick="sortTable('Отдел')" role="columnheader">Отдел <span class="sort-indicator">⬍</span></th>
+                            <th data-sort-col="ЛМ" onclick="sortTable('ЛМ')" role="columnheader">LM Код <span class="sort-indicator">⬍</span></th>
+                            <th data-sort-col="Наименование товара" onclick="sortTable('Наименование товара')" role="columnheader">Товар <span class="sort-indicator">⬍</span></th>
+                            <th data-sort-col="Зона" onclick="sortTable('Зона')" role="columnheader">Зона <span class="sort-indicator">⬍</span></th>
+                            <th data-sort-col="Кол-во физическое" onclick="sortTable('Кол-во физическое')" role="columnheader">Физ. кол-во <span class="sort-indicator">⬍</span></th>
+                            <th data-sort-col="Кол-во доступное" onclick="sortTable('Кол-во доступное')" role="columnheader">Доступно <span class="sort-indicator">⬍</span></th>
+                            <th data-sort-col="Макс. Запас" onclick="sortTable('Макс. Запас')" role="columnheader">Макс <span class="sort-indicator">⬍</span></th>
+                            <th data-sort-col="Наполненность %" onclick="sortTable('Наполненность %')" role="columnheader">📊 Наполненность <span class="sort-indicator">⬍</span></th>
+                            <th data-sort-col="Пополнение" onclick="sortTable('Пополнение')" role="columnheader">Пополнение <span class="sort-indicator">⬍</span></th>
+                            <th role="columnheader">🔄 Источник пополнения</th>
+                            <!--<th role="columnheader">SSCC</th>-->
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+            <div class="pagination" id="pagination" role="navigation" aria-label="Пагинация"></div>
+        </div>
+
+        <div class="footer" data-service-footer data-title="Пополнение Основных Адресов" data-version-service="restock"
+            data-mail-subject="Main Address Tool"></div>
+    </div>
+
+    <!-- === MODAL: Info === -->
+    <div class="modal-overlay" id="infoModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">📋 Информация и Инструкция</h3>
+                <button class="modal-close" onclick="toggleModal()" aria-label="Закрыть">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="instruction-section">
+                    <h4>📥 Как получить данные из WMS Navision</h4>
+                    <ol class="instruction-steps">
+                        <li>
+                            <strong>Откройте WMS Navision</strong>
+                            Глваное окно
+                        </li>
+                        <li>
+                            <strong>Перейдите по ссылке</strong>
+                            Нажмите на ссылку <code>Содержимое ячеек (расширенное)</code>
+                        </li>
+                        <li>
+                            <strong>Откройте вкладку действий</strong>
+                            Нажмите на вкладку <code>Действия</code> в верхней панели
+                        </li>
+                        <li>
+                            <strong>Запустите отчёт</strong>
+                            Нажмите на отчёт <code>Пополнение основного адреса</code>
+                        </li>
+                        <li>
+                            <strong>Настройте фильтр</strong>
+                            В поле <code>Тип зоны фильтр</code> выберите необходимую зону
+                        </li>
+                        <li>
+                            <strong>Выгрузите данные</strong>
+                            Нажмите <code>OK</code> и сохраните файл в формате Excel
+                        </li>
+                        <li>
+                            <strong>Сохраните файл</strong>
+                            Сохраните выгруженный файл в удобном месте на компьютере
+                        </li>
+                        <li>
+                            <strong>Загрузите в инструмент</strong>
+                            Перетащите файл <code>Ваш_файл.xlsx</code> в область загрузки, либо вставьте нажатием на область загрузки через проводник
+                        </li>
+						<li>
+                            <strong>Выберите нужные зоны для анализа</strong>
+                            Выберите все зоны или только необходимые
+                        </li>
+                    </ol>
+                </div>
+                <div class="info-cards">
+                    <div class="info-card">
+                        <div class="info-card-icon">💾</div>
+                        <h5>Сохранение данных</h5>
+                        <p>Данные хранятся локально в браузере (IndexedDB) до ручной очистки. При обновлении страницы данные сохраняются.</p>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-card-icon">📊</div>
+                        <h5>Аналитика</h5>
+                        <p>Автоматический расчёт наполненности, определение потребности в пополнении и поиск источников.</p>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-card-icon">📥</div>
+                        <h5>Экспорт</h5>
+                        <p>Выгрузка результатов в Excel с форматированием, условным форматированием и фильтрами.</p>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-card-icon">🔒</div>
+                        <h5>Безопасность</h5>
+                        <p>Все данные обрабатываются локально в вашем браузере и не передаются на внешние серверы.</p>
+                    </div>
+                </div>
+                <h5 class="important-header">⚠️ Важно знать</h5>
+                <div class="warning-box">
+                    <p style="text-indent: 20px;">
+                        Если артикул имеет основной адрес но у него не установлен максимальный запас, то такой артикул можно исключить из выборки. Это облегчит анализ для выявления потребности пополнения основных адресов только для контролируемых артикулов. Предварительно в Navision можно убрать максимальный запас у артикулов с топ EM.
+                    </p>
+                </div>
+                <div class="modal-card" style="margin-top: 20px;">
+                    <ul>
+                        <li><strong>🏠 Основной адрес</strong> - где должен храниться товар</li>
+                        <li><strong>📍 Источники</strong> - адреса с фактическим количеством</li>
+                        <li><strong>📊 Наполненность %</strong> = (В основном / Макс. Запас) × 100%</li>
+                        <li><strong>✅ SKU</strong> - уникальные артикулы</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- === MODAL: Zone selection before load === -->
+    <div class="modal-overlay" id="zoneSelectModal" role="dialog" aria-modal="true" aria-labelledby="zoneSelectTitle">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="zoneSelectTitle">🗺️ Выбор зон для загрузки</h3>
+                <button class="modal-close" onclick="cancelZoneSelect()" aria-label="Закрыть">✕</button>
+            </div>
+            <div class="modal-body">
+                <p class="zone-select-hint">
+                    Файл обработан. Выберите зоны, которые нужно загрузить в сервис.
+                    Данные сохраняются в памяти браузера.
+                </p>
+                <div class="zone-select-total" id="zsTotalInfo"></div>
+                <div class="zone-select-actions">
+                    <button onclick="zoneSelectSetAll(true)">✅ Выбрать все</button>
+                    <button class="reset" onclick="zoneSelectSetAll(false)">⬜ Снять все</button>
+                </div>
+                <div class="zone-select-list" id="zoneSelectList"></div>
+                <div class="zone-select-summary" id="zsSummary"></div>
+                <label class="zone-modal-option" for="zoneExcludeNoMax">
+                    <input type="checkbox" id="zoneExcludeNoMax" onchange="updateZoneSelection()">
+                    <span>Исключить позиции без макс. запаса (Макс. Запас = 0)</span>
+                </label>
+                <div class="zone-select-footer">
+                    <button class="btn btn-secondary" onclick="cancelZoneSelect()">Отмена</button>
+                    <button class="btn" id="zsBtnLoad" onclick="confirmZoneSelect()">💾 Загрузить и сохранить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    /* =====================================================
+       Сервис: Пополнение Основных Адресов - логика
+       Общее: shared/js/idb.js, shared/js/common.js
+       ===================================================== */
+
+    // === IndexedDB ===
+    const idb = new IDBStore({ dbName: 'lemanapro_restock', storeName: 'kv', version: 1 });
+    const IDB_KEY = 'restock_data';
+    const storage = createReportStorage({
+        idb,
+        key: IDB_KEY,
+        wrapped: true,
+    });
+
+    // === Global State ===
+    let rawData = [];
+    let uniqueArticles = [];
+    let filteredData = [];
+    let allStorageLocations = {};
+    let currentPage = 1;
+    const rowsPerPage = 50;
+    let charts = { dept: null, fill: null };
+    let sortColumn = null;
+    let sortDirection = false;
+    let isSessionOnly = false;
+    let selectedUploadZones = [];
+    let uploadExcludeNoMax = false;
+    let pendingZones = {};
+
+
+    // === Initialization ===
+    document.addEventListener('DOMContentLoaded', function() {
+        setupUploadArea('uploadArea', 'fileInput', handleFile);
+        setupFilters();
+        setupEscapeToClose('infoModal', toggleModal);
+        setupEscapeToClose('zoneSelectModal', cancelZoneSelect);
+        loadSavedData();
+    });
+
+    // === Data Persistence (IndexedDB) ===
+    async function loadSavedData() {
+        try {
+            const payload = await storage.load();
+            if (payload && payload.records.length > 0) {
+                const zones = payload.meta && Array.isArray(payload.meta.zones)
+                    ? payload.meta.zones
+                    : [];
+                const excludeNoMax = !!(payload.meta && payload.meta.excludeNoMax === true);
+                restoreData(payload.records, payload.timestamp, zones, excludeNoMax);
+            }
+        } catch (e) {
+            console.error('Ошибка чтения из IndexedDB:', e);
+        }
+    }
+
+    function restoreData(records, timestamp, zones = [], excludeNoMax = false) {
+        uniqueArticles = records;
+        selectedUploadZones = zones;
+        uploadExcludeNoMax = excludeNoMax;
+        filteredData = [...uniqueArticles];
+        buildStorageLocationsMapFromUnique(uniqueArticles);
+        setExcludeNoMaxFilterVisible(!excludeNoMax);
+        updateNotice('saved', uniqueArticles.length, new Date(timestamp || Date.now()), zones);
+        showUpload(false);
+        showDashboard(true);
+        initializeDashboard();
+    }
+
+    async function saveData(zones = selectedUploadZones, excludeNoMax = uploadExcludeNoMax) {
+        try {
+            await storage.save(uniqueArticles, Date.now(), { zones, excludeNoMax });
+            isSessionOnly = false;
+            updateNotice('saved', uniqueArticles.length, new Date(), zones);
+            return true;
+        } catch (error) {
+            console.error('Ошибка сохранения в IndexedDB:', error);
+            isSessionOnly = true;
+            if (error.name === 'QuotaExceededError') {
+                console.warn('IndexedDB quota exceeded. Switching to session-only mode.');
+            }
+            updateNotice('session', uniqueArticles.length, null, zones);
+            return false;
+        }
+    }
+
+    function updateNotice(mode, count, date, zones = []) {
+        const notice = document.getElementById('dataNotice');
+        const title = document.getElementById('noticeTitle');
+        const info = document.getElementById('dataInfo');
+        if (!notice) return;
+        notice.classList.add('active');
+        notice.classList.remove('session');
+        if (title) title.textContent = mode === 'saved' ? '💾 Данные сохранены!' : '⚠️ Режим сессии (без сохранения)!';
+        if (info) {
+            const zonesText = zones.length
+                ? ` | Зоны: <strong>${zones.map(zone => escapeHtml(zone)).join(', ')}</strong>`
+                : '';
+            const exclText = uploadExcludeNoMax
+                ? ' | Исключено: <strong>без макс. запаса</strong>'
+                : '';
+            if (mode === 'saved') {
+                info.innerHTML = `Загружено артикулов: <strong>${count.toLocaleString('ru-RU')}</strong>${zonesText}${exclText} | Дата: <strong>${date.toLocaleString('ru-RU')}</strong>`;
+            } else {
+                notice.classList.add('session');
+                info.innerHTML = `Загружено артикулов: <strong>${count.toLocaleString('ru-RU')}</strong>${zonesText}${exclText} | Данные будут удалены при закрытии страницы`;
+            }
+        }
+    }
+
+    function setExcludeNoMaxFilterVisible(visible) {
+        const group = document.getElementById('excludeNoMaxGroup');
+        if (group) group.style.display = visible ? '' : 'none';
+        if (!visible) {
+            const checkbox = document.getElementById('excludeNoMax');
+            if (checkbox) checkbox.checked = false;
+        }
+    }
+
+    // === Clear with confirmation (IndexedDB deleteDB) ===
+    function doClearRestock() {
+        storage.clear().then(() => {
+            rawData = [];
+            uniqueArticles = [];
+            filteredData = [];
+            allStorageLocations = {};
+            selectedUploadZones = [];
+            uploadExcludeNoMax = false;
+            pendingZones = {};
+            currentPage = 1;
+            sortColumn = null;
+            sortDirection = false;
+
+            // Сброс фильтров
+            const searchInput = document.getElementById('searchInput');
+            const deptFilter = document.getElementById('departmentFilter');
+            const zoneFilter = document.getElementById('zoneFilter');
+            const fillFilter = document.getElementById('fillFilter');
+            const excludeNoMax = document.getElementById('excludeNoMax');
+            if (searchInput) searchInput.value = '';
+            if (deptFilter) deptFilter.value = '';
+            if (zoneFilter) zoneFilter.value = '';
+            if (fillFilter) fillFilter.value = '';
+            if (excludeNoMax) excludeNoMax.checked = false;
+            setExcludeNoMaxFilterVisible(true);
+
+            destroyCharts(charts);
+
+            document.getElementById('dataNotice').classList.remove('active');
+            document.getElementById('dashboard').classList.remove('active');
+            showUpload(true);
+
+            // Очистка DOM
+            document.getElementById('statsGrid').innerHTML = '';
+            document.getElementById('topProductsCards').innerHTML = '';
+            document.getElementById('tableBody').innerHTML = '';
+            document.getElementById('pagination').innerHTML = '';
+            document.getElementById('heatmapContainer').innerHTML = '';
+        }).catch(e => {
+            console.error('Ошибка очистки IndexedDB:', e);
+            alert('Ошибка очистки данных: ' + e.message);
+        });
+    }
+
+    // === Upload Area ===
+    function handleFile(file) {
+        if (!file.name.match(/\.(xlsx|xls)$/i)) {
+            alert('Пожалуйста, загрузите файл формата .xlsx или .xls');
+            return;
+        }
+        showLoading(true);
+        showUpload(false);
+
+        parseXLSXFile(file).then(jsonData => {
+            const parsed = parseData(jsonData);
+            if (parsed.length === 0) throw new Error('Не удалось найти данные в файле');
+
+            showLoading(false);
+            openZoneSelectModal(parsed);
+        }).catch(error => {
+            console.error('Ошибка обработки:', error);
+            alert('Ошибка обработки: ' + error.message);
+            showLoading(false);
+            showUpload(true);
+        });
+    }
+
+    // === Zone Select Modal (before load) ===
+    function openZoneSelectModal(parsed) {
+        pendingZones = {};
+        parsed.forEach(rec => {
+            const zone = String(rec['Зона'] || '').trim() || 'Не указана';
+            if (!pendingZones[zone]) pendingZones[zone] = { records: [], count: 0, size: 0 };
+            pendingZones[zone].records.push(rec);
+        });
+
+        Object.values(pendingZones).forEach(zone => {
+            zone.count = zone.records.length;
+            zone.size = JSON.stringify(zone.records).length;
+        });
+
+        const zonesSorted = Object.keys(pendingZones).sort((a, b) => a.localeCompare(b, 'ru'));
+        const totalRows = parsed.length;
+        const totalSize = Object.values(pendingZones).reduce((sum, zone) => sum + zone.size, 0);
+
+        document.getElementById('zsTotalInfo').innerHTML = `
+            <span>Зон в файле: <strong>${zonesSorted.length}</strong></span>
+            <span>Позиций всего: <strong>${totalRows.toLocaleString('ru-RU')}</strong></span>
+            <span>Общий объём: <strong>${formatSize(totalSize)}</strong></span>
+        `;
+
+        document.getElementById('zoneSelectList').innerHTML = zonesSorted.map(zone => `
+            <label class="zone-select-item">
+                <input type="checkbox" checked data-zone="${escapeHtml(zone)}" onchange="updateZoneSelection()">
+                <span class="zone-select-name">🗺️ ${escapeHtml(zone)}</span>
+                <span class="zone-select-meta">${pendingZones[zone].count.toLocaleString('ru-RU')} поз. • ${formatSize(pendingZones[zone].size)}</span>
+            </label>
+        `).join('');
+
+        const excludeCb = document.getElementById('zoneExcludeNoMax');
+        if (excludeCb) excludeCb.checked = false;
+
+        document.getElementById('zoneSelectModal').classList.add('active');
+        updateZoneSelection();
+    }
+
+    function zoneSelectSetAll(state) {
+        document.querySelectorAll('#zoneSelectList input[type="checkbox"]').forEach(cb => {
+            cb.checked = state;
+        });
+        updateZoneSelection();
+    }
+
+    function getSelectedZoneNames() {
+        const result = [];
+        document.querySelectorAll('#zoneSelectList input[type="checkbox"]').forEach(cb => {
+            if (cb.checked) result.push(cb.dataset.zone);
+        });
+        return result;
+    }
+
+    function formatSize(chars) {
+        if (chars >= 1000000) return (chars / 1000000).toFixed(2) + ' МБ';
+        if (chars >= 1000) return (chars / 1000).toFixed(1) + ' КБ';
+        return chars + ' Б';
+    }
+
+    function updateZoneSelection() {
+        const selected = getSelectedZoneNames();
+        const excludeNoMax = document.getElementById('zoneExcludeNoMax');
+        const exclude = !!(excludeNoMax && excludeNoMax.checked);
+        let rows = 0;
+        let size = 0;
+
+        selected.forEach(zone => {
+            const data = pendingZones[zone];
+            if (!data) return;
+            if (exclude) {
+                rows += data.records.filter(rec => (parseNullableNumber(rec['Макс. Запас']) ?? 0) > 0).length;
+            } else {
+                rows += data.count;
+            }
+            size += data.size;
+        });
+
+        const excludedNote = exclude ? ' • без макс. запаса' : '';
+        document.getElementById('zsSummary').innerHTML = selected.length && rows
+            ? `Выбрано зон: <strong>${selected.length}</strong> • <strong>${rows.toLocaleString('ru-RU')}</strong> позиций • ~${formatSize(size)}${excludedNote}`
+            : (selected.length
+                ? 'В выбранных зонах нет позиций с максимальным запасом'
+                : 'Зоны не выбраны - загрузка недоступна');
+
+        const btn = document.getElementById('zsBtnLoad');
+        if (btn) btn.disabled = selected.length === 0 || rows === 0;
+    }
+
+    function cancelZoneSelect() {
+        document.getElementById('zoneSelectModal').classList.remove('active');
+        pendingZones = {};
+        showLoading(false);
+        showUpload(uniqueArticles.length === 0);
+    }
+
+    function confirmZoneSelect() {
+        const selected = getSelectedZoneNames();
+        if (selected.length === 0) return;
+
+        const excludeCb = document.getElementById('zoneExcludeNoMax');
+        const exclude = !!(excludeCb && excludeCb.checked);
+
+        let records = [];
+        selected.forEach(zone => {
+            if (pendingZones[zone]) records = records.concat(pendingZones[zone].records);
+        });
+
+        if (exclude) {
+            records = records.filter(rec => (parseNullableNumber(rec['Макс. Запас']) ?? 0) > 0);
+        }
+
+        if (records.length === 0) {
+            alert('В выбранных зонах нет позиций с максимальным запасом. Снимите галочку или выберите другие зоны.');
+            return;
+        }
+
+        rawData = records;
+        uniqueArticles = groupUniqueArticles(rawData);
+        buildStorageLocationsMapFromUnique(uniqueArticles);
+        filteredData = [...uniqueArticles];
+        selectedUploadZones = selected;
+        uploadExcludeNoMax = exclude;
+        setExcludeNoMaxFilterVisible(!exclude);
+        currentPage = 1;
+        sortColumn = null;
+        sortDirection = false;
+
+        document.getElementById('zoneSelectModal').classList.remove('active');
+        pendingZones = {};
+
+        saveData(selected, exclude).then(() => {
+            initializeDashboard();
+        });
+    }
+
+    // === Data Parsing ===
+    function parseData(jsonData) {
+        const data = [];
+        let headers = [];
+        let headerRowIndex = -1;
+
+        for (let i = 0; i < Math.min(jsonData.length, 50); i++) {
+            const row = jsonData[i] || [];
+            const rowText = row.join(' ').toLowerCase();
+            if (rowText.includes('основной адрес') && rowText.includes('наименование')) {
+                headers = row.map(h => h ? String(h).trim() : '');
+                headerRowIndex = i;
+                break;
+            }
+        }
+
+        if (headerRowIndex === -1) throw new Error('Не найдена строка заголовков');
+        validateXLSXHeaders(jsonData, [
+            'Основной адрес',
+            'Наименование',
+            'ЛМ',
+            ['Кол-во физическое', 'Кол-во физ.', 'Физическое', 'Кол-во доступное', 'Доступное', 'Кол-во'],
+            ['Макс. Запас', 'Макс', 'Максимальный запас'],
+            'Пополнение'
+        ], headerRowIndex);
+
+        const colMap = {
+            addr: findColumnIndex(headers, ['Основной адрес']),
+            dept: findColumnIndex(headers, ['Отдел']),
+            lm: findColumnIndex(headers, ['ЛМ']),
+            name: findColumnIndex(headers, ['Наименование товара', 'Наименование']),
+            zone: findColumnIndex(headers, ['Зона']),
+            storageAddr: findStorageAddressColumn(headers),
+            sscc: findColumnIndex(headers, ['SSCC', 'ССКК', 'sscc']),
+            qtyPhysical: findColumnIndex(headers, ['Кол-во физическое', 'Кол-во физ.', 'Физическое']),
+            qtyAvailable: findColumnIndex(headers, ['Кол-во доступное', 'Доступное', 'Доступный запас']),
+            qty: findColumnIndex(headers, ['Кол-во физическое', 'Кол-во физ.', 'Физическое', 'Кол-во доступное', 'Доступное', 'Кол-во']),
+            max: findColumnIndex(headers, ['Макс. Запас', 'Макс', 'Максимальный запас']),
+            restock: findColumnIndex(headers, ['Пополнение'])
+        };
+
+        if (colMap.lm === -1 || colMap.addr === -1) {
+            throw new Error('Не найдены обязательные колонки: "ЛМ" или "Основной адрес"');
+        }
+
+        for (let i = headerRowIndex + 1; i < jsonData.length; i++) {
+            const row = jsonData[i] || [];
+            if (row.length < 3) continue;
+            if (row[0] && String(row[0]).includes('Пополнение Основного')) continue;
+            if (row.every(cell => !cell || cell === '')) continue;
+
+            const addrVal = colMap.addr >= 0 ? row[colMap.addr] : null;
+            const nameVal = colMap.name >= 0 ? row[colMap.name] : null;
+            const lmVal = colMap.lm >= 0 ? row[colMap.lm] : null;
+
+            if (!addrVal && !nameVal) continue;
+
+            const physicalRaw = colMap.qtyPhysical >= 0
+                ? row[colMap.qtyPhysical]
+                : (colMap.qty >= 0 ? row[colMap.qty] : 0);
+            const availableRaw = colMap.qtyAvailable >= 0
+                ? row[colMap.qtyAvailable]
+                : physicalRaw;
+            const physical = parseNullableNumber(physicalRaw) ?? 0;
+            const available = parseNullableNumber(availableRaw) ?? 0;
+            const max = parseNullableNumber(colMap.max >= 0 ? row[colMap.max] : 0) ?? 0;
+            const actualAddress = colMap.storageAddr >= 0 ? row[colMap.storageAddr] : '';
+            const sscc = colMap.sscc >= 0 ? cleanValue(row[colMap.sscc]) : '';
+
+            data.push({
+                'Основной адрес': cleanValue(addrVal),
+                'Отдел': cleanValue(colMap.dept >= 0 ? row[colMap.dept] : ''),
+                'ЛМ': cleanValue(lmVal),
+                'Наименование товара': cleanValue(nameVal),
+                'Зона': cleanValue(colMap.zone >= 0 ? row[colMap.zone] : ''),
+                'Адрес': cleanValue(actualAddress),
+                'SSCC': sscc,
+                'Кол-во физическое': physical,
+                'Кол-во доступное': available,
+                'Макс. Запас': max,
+                'Пополнение': parseNumber(colMap.restock >= 0 ? row[colMap.restock] : 0),
+                'Наполненность %': max > 0 ? Number(((physical / max) * 100).toFixed(1)) : null
+            });
+        }
+        return data;
+    }
+
+    function findStorageAddressColumn(headers) {
+        let exactIndex = headers.findIndex(h => h && h.trim() === 'Адрес');
+        if (exactIndex >= 0) return exactIndex;
+        return headers.findIndex(h => h && h.toLowerCase().includes('адрес') && !h.toLowerCase().includes('основной'));
+    }
+
+    function groupUniqueArticles(data) {
+        const grouped = {};
+        data.forEach(item => {
+            const key = `${item['Основной адрес']}-${item['ЛМ']}`;
+            if (!grouped[key]) {
+                grouped[key] = {
+                    'Основной адрес': item['Основной адрес'],
+                    'Отдел': item['Отдел'],
+                    'ЛМ': item['ЛМ'],
+                    'Наименование товара': item['Наименование товара'],
+                    'Зона': item['Зона'],
+                    'Кол-во физическое': 0,
+                    'Кол-во доступное': 0,
+                    'Макс. Запас': item['Макс. Запас'],
+                    'Пополнение': 0,
+                    'SSCC': item['SSCC'],
+                    'storageLocations': []
+                };
+            }
+            const actualAddress = item['Адрес'] ? String(item['Адрес']).trim() : '';
+            const mainAddress = item['Основной адрес'] ? String(item['Основной адрес']).trim() : '';
+            const isMainAddress = !actualAddress ||
+                actualAddress === mainAddress ||
+                actualAddress.toUpperCase().includes('OSN') ||
+                actualAddress.toUpperCase().includes('MAIN');
+            if (isMainAddress) {
+                grouped[key]['Кол-во физическое'] += item['Кол-во физическое'];
+                grouped[key]['Кол-во доступное'] += item['Кол-во доступное'];
+            }
+            grouped[key]['Пополнение'] += item['Пополнение'];
+            if (item['SSCC'] && !grouped[key]['SSCC']) {
+                grouped[key]['SSCC'] = item['SSCC'];
+            }
+            if (item['Кол-во физическое'] > 0 || item['Кол-во доступное'] > 0) {
+                grouped[key]['storageLocations'].push({
+                    address: actualAddress || mainAddress,
+                    qty: item['Кол-во доступное'],
+                    physical: item['Кол-во физическое'],
+                    available: item['Кол-во доступное'],
+                    isMain: isMainAddress,
+                    sscc: item['SSCC']
+                });
+            }
+        });
+        return Object.values(grouped).map(item => {
+            const max = parseNullableNumber(item['Макс. Запас']) ?? 0;
+            const physical = parseNullableNumber(item['Кол-во физическое']) ?? 0;
+            item['Макс. Запас'] = max;
+            item['Наполненность %'] = max > 0 ? Number(((physical / max) * 100).toFixed(1)) : null;
+            return item;
+        });
+    }
+
+    function buildStorageLocationsMapFromUnique(unique) {
+        allStorageLocations = {};
+        unique.forEach(item => {
+            const lm = item['ЛМ'];
+            if (!lm) return;
+            if (!allStorageLocations[lm]) allStorageLocations[lm] = [];
+            item.storageLocations.forEach(loc => {
+                allStorageLocations[lm].push({
+                    address: loc.address,
+                    qty: loc.qty,
+                    isMain: loc.isMain,
+                    sscc: loc.sscc
+                });
+            });
+        });
+    }
+
+    // === Helper Functions ===
+    function getReplenishmentSources(lm, mainAddress) {
+        const locations = allStorageLocations[lm] || [];
+        return locations.filter(s => s.address !== mainAddress && s.qty > 0);
+    }
+
+    function isLessThanPercent(item, threshold) {
+        const fill = parseFloat(item['Наполненность %']);
+        return item['Макс. Запас'] > 0 && fill > 0 && fill <= threshold;
+    }
+
+    function isEmptyItem(item) {
+        return item['Макс. Запас'] > 0 && parseFloat(item['Наполненность %']) === 0;
+    }
+
+    // === Modal ===
+    function toggleModal() {
+        const modal = document.getElementById('infoModal');
+        if (modal) modal.classList.toggle('active');
+        if (modal && modal.classList.contains('active')) {
+            const close = modal.querySelector('.modal-close');
+            if (close) close.focus();
+        }
+    }
+    const infoModal = document.getElementById('infoModal');
+    if (infoModal) {
+        infoModal.addEventListener('click', function(e) {
+            if (e.target === this) toggleModal();
+        });
+    }
+
+    // === Dashboard ===
+    function initializeDashboard() {
+        showDashboard(true);
+        showLoading(false);
+        updateFilters();
+        applyFilters();
+        updateStats();
+        refreshDashboardVisuals();
+    }
+
+    function refreshDashboardVisuals() {
+        updateTopProductsCards();
+        createCharts();
+        createHeatmap();
+    }
+
+    // === Stats ===
+    function updateStats() {
+        // Статистика - общий срез по всему отчёту, фильтры на неё не влияют
+        const source = uniqueArticles;
+        const total = source.length;
+        const lessThan30 = source.filter(i => isLessThanPercent(i, 30)).length;
+        const lessThan60 = source.filter(i => isLessThanPercent(i, 60)).length;
+        const lessThan75 = source.filter(i => isLessThanPercent(i, 75)).length;
+        const zeroFill = source.filter(i => isEmptyItem(i)).length;
+        const noMaxStock = source.filter(i => i['Макс. Запас'] <= 0).length;
+        document.getElementById('statsGrid').innerHTML = `
+            <div class="stat-card info"><div class="stat-value">${total}</div><div class="stat-label">SKU</div></div>
+            <div class="stat-card fill30" title="Наполненность от 0% до 30%"><div class="stat-value">${lessThan30}</div><div class="stat-label">Меньше 30%</div></div>
+            <div class="stat-card fill60" title="Наполненность от 0% до 60%"><div class="stat-value">${lessThan60}</div><div class="stat-label">Меньше 60%</div></div>
+            <div class="stat-card fill75" title="Наполненность от 0% до 75%"><div class="stat-value">${lessThan75}</div><div class="stat-label">Меньше 75%</div></div>
+            <div class="stat-card success"><div class="stat-value">${zeroFill}</div><div class="stat-label">Пустые (0%)</div></div>
+            <div class="stat-card neutral"><div class="stat-value">${noMaxStock}</div><div class="stat-label">Без макс. запаса</div></div>
+        `;
+    }
+
+    // === Filters ===
+    function updateFilters() {
+        const depts = [...new Set(uniqueArticles.map(i => i['Отдел']).filter(Boolean))].sort();
+        const zones = [...new Set(uniqueArticles.map(i => i['Зона']).filter(Boolean))].sort();
+        const deptSel = document.getElementById('departmentFilter');
+        const zoneSel = document.getElementById('zoneFilter');
+        if (deptSel) deptSel.innerHTML = '<option value="">Все отделы</option>' + depts.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
+        if (zoneSel) zoneSel.innerHTML = '<option value="">Все зоны</option>' + zones.map(z => `<option value="${escapeHtml(z)}">${escapeHtml(z)}</option>`).join('');
+    }
+
+    function setupFilters() {
+        const searchInput = document.getElementById('searchInput');
+        const deptFilter = document.getElementById('departmentFilter');
+        const zoneFilter = document.getElementById('zoneFilter');
+        const fillFilter = document.getElementById('fillFilter');
+        const excludeNoMax = document.getElementById('excludeNoMax');
+        if (searchInput) searchInput.addEventListener('input', applyFilters);
+        if (deptFilter) deptFilter.addEventListener('change', applyFilters);
+        if (zoneFilter) zoneFilter.addEventListener('change', applyFilters);
+        if (fillFilter) fillFilter.addEventListener('change', applyFilters);
+        if (excludeNoMax) excludeNoMax.addEventListener('change', applyFilters);
+        // Фильтры не сохраняются между перезагрузками страницы
+    }
+
+    function applyFilters() {
+        const searchInput = document.getElementById('searchInput');
+        const deptFilter = document.getElementById('departmentFilter');
+        const zoneFilter = document.getElementById('zoneFilter');
+        const fillFilter = document.getElementById('fillFilter');
+        const excludeNoMax = document.getElementById('excludeNoMax');
+        const search = searchInput ? searchInput.value.trim() : '';
+        const dept = deptFilter ? deptFilter.value.trim() : '';
+        const zone = zoneFilter ? zoneFilter.value.trim() : '';
+        const fillRange = fillFilter ? fillFilter.value : '';
+        const excludeWithoutMax = !!(excludeNoMax && excludeNoMax.checked);
+
+        filteredData = uniqueArticles.filter(item => {
+            const matchSearch = !search || item['ЛМ'].includes(search);
+            const matchDept = !dept || item['Отдел'].trim() === dept;
+            const matchZone = !zone || item['Зона'].trim() === zone;
+            const matchMaxStock = !excludeWithoutMax || item['Макс. Запас'] > 0;
+            let matchFill = true;
+            if (fillRange && item['Макс. Запас'] > 0) {
+                const fill = parseFloat(item['Наполненность %']);
+                if (fillRange === '0') matchFill = fill === 0;
+                else if (fillRange === '0-30') matchFill = fill > 0 && fill <= 30;
+                else if (fillRange === '0-60') matchFill = fill > 0 && fill <= 60;
+                else if (fillRange === '0-75') matchFill = fill > 0 && fill <= 75;
+                else if (fillRange === '0-90') matchFill = fill > 0 && fill <= 90;
+                else if (fillRange === '100+') matchFill = fill >= 100;
+            }
+            // Артикулы без максимального запаса не исключаются фильтром наполненности:
+            // для них есть отдельный чекбокс «Исключить без макс. запаса».
+            return matchSearch && matchDept && matchZone && matchMaxStock && matchFill;
+        });
+        // Фильтры влияют только на таблицу. Карточки, графики и тепловая карта - общий срез.
+        currentPage = 1;
+        updateTable();
+    }
+
+    function resetFilters() {
+        const searchInput = document.getElementById('searchInput');
+        const deptFilter = document.getElementById('departmentFilter');
+        const zoneFilter = document.getElementById('zoneFilter');
+        const fillFilter = document.getElementById('fillFilter');
+        const excludeNoMax = document.getElementById('excludeNoMax');
+        if (searchInput) searchInput.value = '';
+        if (deptFilter) deptFilter.value = '';
+        if (zoneFilter) zoneFilter.value = '';
+        if (fillFilter) fillFilter.value = '';
+        if (excludeNoMax) excludeNoMax.checked = false;
+        applyFilters();
+    }
+
+    // === Table ===
+    function getFillClass(percent) {
+        if (!Number.isFinite(percent)) return 'fill-na';
+        if (percent === 0) return 'fill-empty';
+        if (percent < 30) return 'fill-critical';
+        if (percent < 60) return 'fill-low';
+        if (percent < 90) return 'fill-medium';
+        return 'fill-high';
+    }
+
+    function updateTable() {
+        const tbody = document.getElementById('tableBody');
+        const start = (currentPage - 1) * rowsPerPage;
+        const pageData = filteredData.slice(start, start + rowsPerPage);
+        tbody.innerHTML = '';
+
+        pageData.forEach(item => {
+            const r = item['Пополнение'];
+            const cls = r < 0 ? 'negative' : r > 0 ? 'positive' : 'zero';
+            const sources = getReplenishmentSources(item['ЛМ'], item['Основной адрес']);
+            let sourcesHtml = '';
+            if (sources.length > 0) {
+                sourcesHtml = sources.slice(0, 5).map(s => {
+                    const ssccBadge = s.sscc ? `<span class="sscc-badge" title="SSCC: ${escapeHtml(s.sscc)}">SSCC</span>` : '';
+                    return `<span class="replenish-source" title="Адрес: ${escapeHtml(s.address)}${s.sscc ? ' • SSCC: ' + escapeHtml(s.sscc) : ''}">${escapeHtml(s.address)}${ssccBadge} (${s.qty})</span>`;
+                }).join('');
+                if (sources.length > 5) {
+                    sourcesHtml += `<span class="replenish-source">+${sources.length - 5} ещё</span>`;
+                }
+            } else {
+                sourcesHtml = `<p>Нет источника</p>`;
+            }
+            const fillPercent = parseNullableNumber(item['Наполненность %']);
+            const fillClass = getFillClass(fillPercent);
+            const fillWidth = Number.isFinite(fillPercent) ? Math.min(fillPercent, 100) : 0;
+            const fillText = Number.isFinite(fillPercent) ? fillPercent + '%' : 'н/д';
+            const maxStock = item['Макс. Запас'];
+            const rowClass = maxStock <= 0 ? 'no-max-stock' : '';
+            const ssccBadge = item['SSCC'] ? `<span class="sscc-badge" title="SSCC: ${escapeHtml(item['SSCC'])}">SSCC</span>` : '';
+
+            const tr = document.createElement('tr');
+            tr.className = rowClass;
+            tr.innerHTML = `
+                <td>${escapeHtml(item['Основной адрес'])}</td>
+                <td>${escapeHtml(item['Отдел'])}</td>
+                <td><strong><a href="https://magportal.lemanapro.ru/catalogproducts/product/${escapeHtml(item['ЛМ'])}?entry_from=search&isAllGammaView=false#" target="_blank" style="color: black; text-decoration: none; cursor: pointer;">${escapeHtml(item['ЛМ'])}</a></strong></td>
+                <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(item['Наименование товара'])}">${escapeHtml(item['Наименование товара'])}</td>
+                <td>${escapeHtml(item['Зона'])}</td>
+                <td>${item['Кол-во физическое']}</td>
+                <td><strong>${item['Кол-во доступное']}</strong></td>
+                <td>${maxStock > 0 ? maxStock : '-'}</td>
+                <td style="min-width: 120px;">
+                    <span style="display:none;" class="fill-percent-value">${Number.isFinite(fillPercent) ? fillPercent : ''}</span>
+                    <div class="fill-bar"><div class="fill-level ${fillClass}" style="width: ${fillWidth}%"></div></div>
+                    <div class="fill-percent">${fillText}</div>
+                </td>
+                <td class="${cls}">${r}</td>
+                <td>${sourcesHtml}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        enableSingleRowSelection(tbody);
+
+        updatePagination('pagination', Math.ceil(filteredData.length / rowsPerPage), currentPage, 'changePage');
+        updateSortIndicators(sortColumn, sortDirection);
+    }
+
+    function changePage(page) {
+        const totalPages = Math.ceil(filteredData.length / rowsPerPage);
+        if (page < 1 || page > totalPages) return;
+        currentPage = page;
+        updateTable();
+    }
+
+    function sortTable(col) {
+        const res = sortData(filteredData, col, sortColumn, sortDirection);
+        filteredData = res.data;
+        sortColumn = res.sortColumn;
+        sortDirection = res.sortDirection;
+        updateTable();
+    }
+
+    // === Top Products Cards ===
+    function updateTopProductsCards() {
+        const container = document.getElementById('topProductsCards');
+        const candidates = uniqueArticles.filter(i => i['Макс. Запас'] > 0);
+
+        // Если все основные адреса заполнены на 100%, пополнение не требуется - топ не выводим
+        const allFull = candidates.length > 0 && candidates.every(i => {
+            const fill = parseNullableNumber(i['Наполненность %']);
+            return fill !== null && fill >= 100;
+        });
+        if (allFull) {
+            container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 30px; color: #718096;">Все основные адреса заполнены на 100% - пополнение не требуется</div>';
+            return;
+        }
+
+        const needsRestock = candidates
+            .filter(i => {
+                const sources = getReplenishmentSources(i['ЛМ'], i['Основной адрес']);
+                return sources.length > 0;
+            })
+            .sort((a, b) => Number(a['Наполненность %']) - Number(b['Наполненность %']))
+            .slice(0, 10);
+
+        if (needsRestock.length === 0) {
+            container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 30px; color: #718096;">Нет товаров с источниками для отображения</div>';
+            return;
+        }
+
+        container.innerHTML = needsRestock.map((item, index) => {
+            const fillPercent = parseNullableNumber(item['Наполненность %']);
+            const fillClass = getFillClass(fillPercent);
+            const fillText = Number.isFinite(fillPercent) ? fillPercent + '%' : 'н/д';
+            const fillWidth = Number.isFinite(fillPercent) ? Math.min(fillPercent, 100) : 0;
+            const sources = getReplenishmentSources(item['ЛМ'], item['Основной адрес']);
+            const needQty = item['Макс. Запас'] - item['Кол-во доступное'];
+            let textColor = '#48bb78';
+            let bgColor = '#f0fff4';
+            if (fillClass === 'fill-critical') { textColor = '#e53e3e'; bgColor = '#fff5f5'; }
+            else if (fillClass === 'fill-low') { textColor = '#dd6b20'; bgColor = '#fffaf0'; }
+            else if (fillClass === 'fill-medium') { textColor = '#d69e2e'; bgColor = '#fffff0'; }
+            else if (fillClass === 'fill-na') { textColor = '#718096'; bgColor = '#f7fafc'; }
+            let sourcesText = '';
+            if (sources.length > 0) {
+                sourcesText = sources.slice(0, 3).map(s => `${escapeHtml(s.address)}${s.sscc ? ' (' + escapeHtml(s.sscc) + ')' : ''} (${s.qty})`).join(', ');
+                if (sources.length > 3) sourcesText += `, +${sources.length - 3} ещё`;
+            } else {
+                sourcesText = 'Нет источников';
+            }
+            return `
+                <div class="top-card">
+                    <div class="top-card-header">
+                        <span class="top-card-rank">${index + 1}</span>
+                        <span class="top-card-main-address">${escapeHtml(item['Основной адрес'])}</span>
+                        <span class="top-card-lm">${escapeHtml(item['ЛМ'])}</span>
+                    </div>
+                    <div class="top-card-name" title="${escapeHtml(item['Наименование товара'])}">${escapeHtml(item['Наименование товара'])}</div>
+                    <div class="top-card-stats">
+                        <span class="top-card-need">Требуется: ${needQty > 0 ? needQty.toLocaleString() : '0'}</span>
+                        <span class="top-card-fill" style="color: ${textColor}; background: ${bgColor};">${fillText}</span>
+                    </div>
+                    <div class="fill-bar">
+                        <div class="fill-level ${fillClass}" style="width: ${fillWidth}%"></div>
+                    </div>
+                    <div class="top-card-sources"><strong>Источники:</strong> ${sourcesText}</div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // === Charts ===
+    function createCharts() {
+        destroyCharts(charts);
+        const ctx1 = document.getElementById('departmentChart');
+        if (!ctx1) return;
+        const deptCounts = {};
+        uniqueArticles.filter(i => i['Макс. Запас'] > 0).forEach(i => {
+            const d = i['Отдел'] || 'Не указан';
+            deptCounts[d] = (deptCounts[d] || 0) + 1;
+        });
+        charts.dept = new Chart(ctx1.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: Object.keys(deptCounts),
+                datasets: [{
+                    label: 'Количество',
+                    data: Object.values(deptCounts),
+                    backgroundColor: ['#4299e1', '#fc8181', '#68d391', '#f6ad55', '#9f7aea', '#38b2ac']
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, ticks: { stepSize: 1 }, grace: '10%' },
+                    x: { ticks: { maxRotation: 45, minRotation: 45 } }
+                }
+            }
+        });
+
+        const fillRanges = { '0%': 0, '<30%': 0, '30-60%': 0, '60-75%': 0, '75-90%': 0, '90-100%': 0, '100%+': 0 };
+        uniqueArticles.forEach(i => {
+            if (i['Макс. Запас'] <= 0) return;
+            const f = parseNullableNumber(i['Наполненность %']);
+            if (!Number.isFinite(f)) return;
+            if (f === 0) fillRanges['0%']++;
+            else if (f < 30) fillRanges['<30%']++;
+            else if (f < 60) fillRanges['30-60%']++;
+            else if (f < 75) fillRanges['60-75%']++;
+            else if (f < 90) fillRanges['75-90%']++;
+            else if (f < 100) fillRanges['90-100%']++;
+            else fillRanges['100%+']++;
+        });
+        const ctx2 = document.getElementById('fillChart');
+        if (!ctx2) return;
+        charts.fill = new Chart(ctx2.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: Object.keys(fillRanges),
+                datasets: [{
+                    label: 'Количество',
+                    data: Object.values(fillRanges),
+                    backgroundColor: ['#a0aec0', '#f56565', '#f6ad55', '#ed8936', '#48bb78', '#38a169', '#319795']
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true, ticks: { stepSize: 1 }, grace: '10%' } }
+            }
+        });
+    }
+
+    // === Heatmap ===
+    function getHeatmapClass(percent) {
+        if (percent === 0) return 'heatmap-0';
+        if (percent < 30) return 'heatmap-30';
+        if (percent < 60) return 'heatmap-60';
+        if (percent < 75) return 'heatmap-75';
+        if (percent < 90) return 'heatmap-90';
+        return 'heatmap-100';
+    }
+
+    function createHeatmap() {
+        const container = document.getElementById('heatmapContainer');
+        const zones = [...new Set(uniqueArticles.map(i => i['Зона']).filter(Boolean))].sort();
+        const ranges = [
+            { label: '0%', min: 0, max: 0 },
+            { label: '<30%', min: 0.1, max: 30 },
+            { label: '30-60%', min: 30, max: 60 },
+            { label: '60-75%', min: 60, max: 75 },
+            { label: '75-90%', min: 75, max: 90 },
+            { label: '90-100%', min: 90, max: 100 },
+            { label: '100%+', min: 100, max: 999 }
+        ];
+        const heatmapData = {};
+        zones.forEach(zone => {
+            heatmapData[zone] = {};
+            ranges.forEach(range => { heatmapData[zone][range.label] = 0; });
+        });
+        uniqueArticles.forEach(item => {
+            if (item['Макс. Запас'] <= 0) return;
+            const zone = item['Зона'] || 'Не указана';
+            const fill = parseNullableNumber(item['Наполненность %']);
+            if (!Number.isFinite(fill)) return;
+            for (const range of ranges) {
+                if (fill >= range.min && fill <= range.max) {
+                    if (!heatmapData[zone]) heatmapData[zone] = {};
+                    if (!heatmapData[zone][range.label]) heatmapData[zone][range.label] = 0;
+                    heatmapData[zone][range.label]++;
+                    break;
+                }
+            }
+        });
+        let html = '<table class="heatmap-table"><thead><tr><th>Зона</th>';
+        ranges.forEach(range => { html += `<th>${range.label}</th>`; });
+        html += '</tr></thead><tbody>';
+        zones.forEach(zone => {
+            html += `<tr><td><strong>${escapeHtml(zone)}</strong></td>`;
+            ranges.forEach(range => {
+                const count = heatmapData[zone][range.label] || 0;
+                const className = count > 0 ? getHeatmapClass(range.min > 0 ? (range.min + range.max) / 2 : 0) : '';
+                html += `<td class="${className ? 'heatmap-cell ' + className : ''}">${count}</td>`;
+            });
+            html += '</tr>';
+        });
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    }
+
+    // === Export ===
+    function exportRestockToXLSX() {
+        if (filteredData.length === 0) { alert('Нет данных для экспорта'); return; }
+        const wsData = [
+            ['Основной адрес', 'Отдел', 'ЛМ', 'Наименование товара', 'Зона', 'Кол-во физическое', 'Кол-во доступное', 'Макс. Запас', 'Пополнение', 'Наполненность %', 'Источник пополнения', 'SSCC', 'Кол-во в источнике']
+        ];
+        filteredData.forEach(item => {
+            const fill = parseNullableNumber(item['Наполненность %']);
+            const fillText = Number.isFinite(fill) ? fill + '%' : 'н/д';
+            const sources = getReplenishmentSources(item['ЛМ'], item['Основной адрес']);
+            if (sources.length === 0) {
+                wsData.push([
+                    item['Основной адрес'], item['Отдел'], item['ЛМ'], item['Наименование товара'], item['Зона'],
+                    item['Кол-во физическое'], item['Кол-во доступное'], item['Макс. Запас'], item['Пополнение'], fillText, '-', item['SSCC'] || '-', '-'
+                ]);
+            } else {
+                sources.forEach(source => {
+                    wsData.push([
+                        item['Основной адрес'], item['Отдел'], item['ЛМ'], item['Наименование товара'], item['Зона'],
+                        item['Кол-во физическое'], item['Кол-во доступное'], item['Макс. Запас'], item['Пополнение'], fillText,
+                        source.address, source.sscc || '-', source.qty
+                    ]);
+                });
+            }
+        });
+        const ws = XLSX.utils.aoa_to_sheet(wsData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Пополнение');
+        ws['!cols'] = [
+            { wch: 18 }, { wch: 12 }, { wch: 14 }, { wch: 50 },
+            { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 12 },
+            { wch: 15 }, { wch: 14 }, { wch: 20 }, { wch: 20 }, { wch: 18 }
+        ];
+        ws['!autofilter'] = { ref: 'A1:M1' };
+        ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+        const dateStr = new Date().toISOString().slice(0, 10);
+        const timeStr = new Date().toTimeString().slice(0, 5).replace(':', '-');
+        XLSX.writeFile(wb, `пополнение_${dateStr}_${timeStr}.xlsx`);
+    }
+    </script>
+</body>
+</html>

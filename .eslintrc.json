@@ -1,0 +1,24 @@
+{
+  "env": {
+    "browser": true,
+    "es2021": true
+  },
+  "parserOptions": {
+    "ecmaVersion": 2020,
+    "sourceType": "script"
+  },
+  "globals": {
+    "XLSX": "readonly",
+    "Chart": "readonly"
+  },
+  "rules": {
+    "no-unused-vars": "warn",
+    "eqeqeq": "error",
+    "no-console": "off",
+    "no-alert": "warn",
+    "no-var": "error",
+    "prefer-const": "error",
+    "semi": ["error", "always"],
+    "quotes": ["error", "single"]
+  }
+}

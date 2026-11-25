@@ -1,0 +1,2200 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Аномалии склада</title>
+    <script src="../../shared/js/config.js"></script>
+    <script src="../../shared/js/pwa-update.js"></script>
+    <script src="../../shared/js-lib/xlsx.full.min.js"></script>
+    <script src="../../shared/js-lib/chart.umd.min.js"></script>
+    <script src="../../shared/js/idb.js"></script>
+    <script src="../../shared/js/common.js"></script>
+    <link rel="stylesheet" href="../../shared/css/common.css">
+    <style>
+        /* =====================================================
+           Сервис: Аномалии склада - уникальные стили
+           Палитра: Золото / Графит (как в «AVS Контроль»)
+           Общее вынесено в shared/css/common.css:
+           здесь только переменные палитры и уникальные блоки.
+           ===================================================== */
+        :root {
+            /* Палитра «Золото / Графит» - как в сервисе «AVS Контроль» */
+            --brand-primary: #4299e1;
+            --brand-primary-dark: #3182ce;
+            --brand-success: #059669;
+            --brand-warning: #d97706;
+            --brand-danger: #e04b00;
+
+            --container-bg: #ffffff;
+            --card-bg: #ffffff;
+            --card-border: #e5e7eb;
+            --section-bg: #f7fafc;
+            --section-bg-2: #edf2f7;
+            --input-bg: #ffffff;
+            --input-border: #fcd34d;
+            --table-hover: #f7fafc;
+            --table-even: #fafbfc;
+            --text-main: #333333;
+            --text-muted: #6b7280;
+            --title-color: #2d3748;
+            --filter-label-color: #4a5568;
+            --header-bg: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+            --header-2: #2d3748;
+            --shadow-color: rgba(0, 0, 0, 0.2);
+
+            --gold-soft: #fffbeb;
+            --gold-medium: #fef3c7;
+            --gold-strong: #fde68a;
+            --gold-line: #fcd34d;
+            --gold-deep: #92400e;
+            --warn-soft: #fff7ed;
+            --ok-soft: #ecfdf5;
+            --footer-bg: #fffbeb;
+            --footer-border: #fde68a;
+        }
+
+        body {
+            background: linear-gradient(150deg, #fcdc68 0%, #ffcd17 50%, #ff9f43 100%);
+        }
+
+        .header {
+            background: var(--header-bg);
+            border-bottom: 4px solid var(--gold-line);
+        }
+
+        .header-left h1 span {
+            color: var(--gold-line);
+        }
+
+        .header-left p {
+            color: var(--gold-strong);
+        }
+
+        .loading p {
+            color: var(--text-main);
+        }
+
+        /* --- Загрузка двух отчётов --- */
+        .upload-section {
+            flex: 1 1 auto;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            background: linear-gradient(180deg, var(--gold-soft) 0%, var(--gold-medium) 100%);
+            border-bottom: 1px solid var(--gold-strong);
+        }
+
+        .upload-area {
+            border-color: var(--gold-line);
+        }
+
+        .upload-area:hover {
+            border-color: var(--brand-warning);
+            background: var(--gold-soft);
+        }
+
+        .upload-area.dragover {
+            border-color: #b45309;
+            background: var(--gold-soft);
+        }
+
+        .upload-text {
+            color: #78350f;
+        }
+
+        .upload-hint {
+            color: var(--gold-deep);
+        }
+
+        .upload-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .upload-grid .upload-area {
+            max-width: none;
+            margin: 0;
+            padding: 30px 22px;
+        }
+
+        .upload-area.loaded {
+            border-color: var(--brand-success);
+            background: var(--ok-soft);
+        }
+
+        .upload-status {
+            margin-top: 10px;
+            font-size: 0.82em;
+            color: var(--text-muted);
+        }
+
+        .upload-area.loaded .upload-status {
+            color: var(--brand-success);
+            font-weight: 700;
+        }
+
+        .upload-actions {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 22px;
+            flex-wrap: wrap;
+        }
+
+		.tr-background{
+			background-color:#AAAAAA;
+			color:#FFFFFF;
+		}
+        /* --- Предупреждение о режиме сессии --- */
+        .session-warning {
+            background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+            border-left: 4px solid var(--brand-warning);
+            padding: 15px 25px;
+            margin: 10px 30px;
+            border-radius: 8px;
+            display: none;
+            align-items: center;
+            gap: 15px;
+            color: #92400e;
+            font-weight: 600;
+        }
+
+        .session-warning.active {
+            display: flex;
+        }
+
+        /* --- Плашка о сохранении данных --- */
+        .data-notice {
+            background: linear-gradient(135deg, var(--gold-soft) 0%, var(--gold-medium) 100%);
+            border-left: 4px solid #b45309;
+        }
+
+        .data-notice-text {
+            color: #78350f;
+        }
+
+        .data-notice-text strong {
+            color: var(--gold-deep);
+        }
+
+        /* --- Показатели --- */
+        .stat-card {
+            color: var(--title-color);
+            border: 2px solid #715b00;
+            cursor: pointer;
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+        }
+
+        .stat-card.avs-critical {
+            background: linear-gradient(135deg, #fffbeb 0%, #fec7c7 100%);
+        }
+
+        .stat-card.avs-warning {
+            background: linear-gradient(135deg, var(--gold-medium) 0%, var(--gold-strong) 100%);
+        }
+
+        .stat-card.avs-normal {
+            background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+        }
+
+        .stat-card.info {
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+        }
+
+        .stat-icon {
+            font-size: 2em;
+            margin-bottom: 8px;
+        }
+
+        .stat-sublabel {
+            font-size: 0.78em;
+            color: #4b5563;
+            margin-top: 4px;
+        }
+
+        /* --- Двухпанельные блоки --- */
+        .split-layout {
+            display: grid;
+            grid-template-columns: 340px minmax(0, 1fr);
+            gap: 18px;
+            align-items: start;
+        }
+
+        /* Панели одной высоты: правая подстраивается под левую,
+           длинная детализация прокручивается внутри панели. */
+        .split-layout > .panel {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .split-layout > .panel > .panel-header {
+            flex: 0 0 auto;
+        }
+
+        .split-layout > .panel > .panel-body {
+            flex: 1 1 auto;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        #detailBody > .empty-state:only-child {
+            flex: 1 1 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .panel {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            padding: 13px 16px;
+            border-bottom: none;
+            background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+            color: #fff;
+            font-weight: 700;
+            font-size: 0.95em;
+            flex-wrap: wrap;
+        }
+
+        .panel-header .ph-meta {
+            font-weight: 500;
+            font-size: 0.85em;
+            color: var(--gold-strong);
+        }
+
+        /* --- Фильтры списка аномалий --- */
+        .list-actions {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+
+        .btn-filter {
+            padding: 4px 7px;
+            font-size: 0.68em;
+            background: var(--gold-medium);
+            color: var(--gold-deep);
+            border: 1px solid var(--gold-line);
+            box-shadow: none;
+        }
+
+        .btn-filter:hover {
+            background: var(--gold-strong);
+        }
+
+        .btn-filter.active {
+            background: linear-gradient(135deg, #b45309 0%, #92400e 100%);
+            color: #fff;
+            border-color: #92400e;
+            box-shadow: 0 2px 8px rgba(146, 64, 14, 0.35);
+        }
+
+        .btn-filter[hidden] {
+            display: none;
+        }
+
+        .panel-body {
+            padding: 16px;
+        }
+
+        /* --- Список аномалий --- */
+        .art-list {
+            max-height: 620px;
+            overflow-y: auto;
+            /* --- display: grid;--- */
+            gap: 8px;
+            padding: 12px;
+        }
+
+        .art-item {
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            padding: 10px 12px;
+            cursor: pointer;
+            background: var(--card-bg);
+            transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .art-item:hover {
+            background: var(--gold-soft);
+            border-color: var(--gold-line);
+            box-shadow: 0 4px 12px rgba(252, 208, 68, 0.25);
+        }
+
+        .art-item.active {
+            border-color: var(--brand-warning);
+            background: var(--gold-medium);
+            box-shadow: inset 3px 0 0 var(--brand-warning);
+        }
+
+        .art-item .ai-top {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            font-size: 0.9em;
+            font-weight: 700;
+        }
+
+        .art-item .ai-name {
+            font-size: 0.78em;
+            color: var(--text-muted);
+            margin: 4px 0 6px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .art-item .ai-meta {
+            display: flex;
+            gap: 4px;
+            flex-wrap: nowrap;
+            overflow: hidden;
+        }
+
+        .art-item .ai-meta .badge {
+            flex: 0 0 auto;
+            padding: 3px 7px;
+            font-size: 0.7em;
+        }
+
+        /* --- Показатели карточки артикула --- */
+        .metric-strip {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .metric-box {
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--section-bg) 0%, var(--section-bg-2) 100%);
+            padding: 9px 10px;
+            text-align: center;
+        }
+
+        .metric-box .mb-value {
+            font-size: 1.05em;
+            font-weight: 700;
+            line-height: 1.15;
+        }
+
+        .metric-box .mb-value.mb-gone {
+            text-decoration: line-through;
+            color: #78350f;
+        }
+
+        .metric-box .mb-label {
+            font-size: 0.66em;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            margin-top: 2px;
+        }
+
+        /* --- Заголовок блока с действиями --- */
+        .section-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .section-title {
+            border-left-color: var(--brand-warning);
+        }
+
+        .section-head .section-title {
+            margin-bottom: 0;
+        }
+
+        .table-info-bar {
+            background: linear-gradient(135deg, var(--gold-soft) 0%, var(--gold-medium) 100%);
+            border-left: 4px solid var(--brand-warning);
+            color: #78350f;
+        }
+
+        #detailBody thead {
+            background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+            color: #fff;
+        }
+
+        #detailBody th:hover {
+            background: #1a202c;
+        }
+
+        /* Три графика в ряд - как в «AVS Контроль» */
+        .charts-row {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .chart-container {
+            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        /* --- Прочее --- */
+        .neg {
+            color: var(--brand-danger);
+            font-weight: 700;
+        }
+
+        .pos {
+            color: var(--brand-success);
+            font-weight: 700;
+        }
+
+        .muted {
+            color: var(--text-muted);
+        }
+
+        .badge.badge-warn {
+            background: var(--gold-medium);
+            color: var(--gold-deep);
+        }
+
+        .badge.badge-qty {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        .badge.badge-qty.zero {
+            background: #f3f4f6;
+            color: #9ca3af;
+        }
+
+        .badge.badge-zone {
+            background: #eff6ff;
+            color: #2563eb;
+        }
+
+        .cell-name {
+            max-width: 320px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .sort-indicator {
+            opacity: 0.45;
+            font-size: 0.9em;
+        }
+
+        .sort-indicator.active {
+            opacity: 1;
+            color: var(--brand-primary);
+        }
+
+        tbody tr.row-alert {
+            background: var(--warn-soft);
+        }
+
+        tbody tr.row-alert:hover {
+            background: #f6e2d4;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 36px 20px;
+            color: var(--text-muted);
+            font-size: 0.92em;
+        }
+
+        .empty-state .es-icon {
+            font-size: 2.4em;
+            margin-bottom: 10px;
+        }
+
+        .filter-hint {
+            font-size: 0.82em;
+            color: #78350f;
+            background: linear-gradient(135deg, var(--gold-soft) 0%, var(--gold-medium) 100%);
+            border-left: 4px solid var(--brand-warning);
+            border-radius: 8px;
+            padding: 10px 14px;
+            margin: 0 0 16px;
+        }
+
+        /* --- Ожидание второго отчёта --- */
+        .upload-waiting {
+            display: none;
+            margin: 18px auto 0;
+            max-width: 620px;
+            text-align: center;
+            padding: 14px 18px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--gold-soft) 0%, var(--gold-medium) 100%);
+            border: 1px solid var(--gold-strong);
+            color: var(--gold-deep);
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+
+        .upload-waiting.active {
+            display: block;
+        }
+
+        /* --- Разделитель в списке аномалий --- */
+        .list-divider {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 6px 2px 2px;
+            font-size: 0.76em;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            color: #b45309;
+        }
+
+        .list-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--gold-line);
+        }
+
+        /* --- Модалка «Информация» (как в «AVS Контроль») --- */
+        .important-header {
+            margin-top: 15px;
+            color: var(--title-color);
+            font-size: 1.05em;
+        }
+
+        .instruction-section {
+            background: linear-gradient(135deg, #ebf8ff 0%, #f0f9ff 100%);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #90cdf4;
+        }
+
+        .instruction-section h4 {
+            color: #2c5282;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #bee3f8;
+        }
+
+        .instruction-steps {
+            list-style: none;
+            counter-reset: step-counter;
+        }
+
+        .instruction-steps li {
+            position: relative;
+            padding-left: 45px;
+            margin-bottom: 15px;
+            line-height: 1.6;
+            color: #4a5568;
+            font-size: 0.88em;
+        }
+
+        .instruction-steps li:last-child {
+            margin-bottom: 0;
+        }
+
+        .instruction-steps li::before {
+            counter-increment: step-counter;
+            content: counter(step-counter);
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+            color: #fff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.9em;
+            box-shadow: 0 2px 6px rgba(66, 153, 225, 0.4);
+        }
+
+        .instruction-steps li strong {
+            color: #2d3748;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .instruction-steps li code {
+            background: #edf2f7;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.85em;
+            color: #2d3748;
+        }
+
+        .info-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .info-card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 15px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+        }
+
+        .info-card-icon {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .info-card h5 {
+            color: #2d3748;
+            font-size: 0.95em;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .info-card p {
+            color: #718096;
+            font-size: 0.85em;
+            line-height: 1.5;
+        }
+
+        .warning-box {
+            background: linear-gradient(135deg, #fff5f5 0%, #fed7d7 100%);
+            border-left: 4px solid #fc8181;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+
+        .warning-box h5 {
+            color: #c53030;
+            font-size: 0.95em;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .warning-box p {
+            color: #742a2a;
+            font-size: 0.85em;
+            line-height: 1.5;
+        }
+
+        .task-actions {
+            justify-content: flex-end;
+            gap: 8px;
+            border-top: 1px solid var(--card-border);
+            border-bottom: none;
+            padding: 12px 20px;
+        }
+
+        /* --- Подвал --- */
+        .footer {
+            background: var(--footer-bg);
+            border-top: 1px solid var(--footer-border);
+            color: #78350f;
+        }
+
+        .footer a {
+            color: #b45309;
+        }
+
+        .footer a:hover {
+            color: #78350f;
+        }
+
+        @media print {
+            body {
+                padding: 0;
+                background: #fff;
+            }
+
+            .container,
+            .modal-content {
+                box-shadow: none;
+                border-radius: 0;
+            }
+
+            .modal-overlay {
+                position: static !important;
+                background: #fff !important;
+                padding: 0 !important;
+            }
+
+            .modal-header,
+            .task-actions,
+            .header,
+            .footer,
+            .filters-section,
+            .tabs-switcher {
+                display: none !important;
+            }
+        }
+
+        @media (max-width: 1100px) {
+            .charts-row {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 900px) {
+            .split-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .art-list {
+                max-height: 340px;
+            }
+        }
+
+        @media (max-width: 720px) {
+            .charts-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 620px) {
+            .upload-section {
+                padding: 24px 12px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header" data-service-header data-icon="⚠️" data-title="Аномалии" data-accent="Склада"
+            data-version-service="anomalies"
+            data-subtitle="Слияние отчёта «Аномалии запаса» с фактическим наличием на адресах склада"></div>
+
+        <div class="session-warning" id="sessionWarning">
+            <span>⚠️ Режим сессии:</span>
+            <span style="font-weight: 400;">Данные слишком большие для сохранения. При обновлении страницы информация пропадет.</span>
+        </div>
+
+        <div class="data-notice" id="dataNotice">
+            <div class="data-notice-text">
+                <strong id="noticeTitle">💾 Данные сохранены!</strong>
+                <span id="dataInfo">-</span>
+            </div>
+            <button class="btn btn-clear" onclick="requestClearData('Все загруженные отчёты будут удалены из браузера. Продолжить?', doClearData)"
+                style="padding: 8px 16px; margin: 0;">🗑️ Очистить</button>
+        </div>
+
+        <div class="upload-section" id="uploadSection">
+            <div class="upload-grid">
+                <div class="upload-area" id="uploadAnomalies" tabindex="0" role="button"
+                    aria-label="Загрузить отчёт «Список аномалий запаса»">
+                    <div class="upload-icon">⚠️</div>
+                    <div class="upload-text">Отчёт 1 - Список аномалий запаса</div>
+                    <div class="upload-hint">Артикулы и аномальное количество по магазину</div>
+                    <div class="upload-status" id="statusAnomalies">Файл не загружен</div>
+                    <input type="file" id="fileAnomalies" accept=".xlsx,.xls" hidden>
+                </div>
+                <div class="upload-area" id="uploadWarehouse" tabindex="0" role="button"
+                    aria-label="Загрузить отчёт из выгрузки содержимое ячеек">
+                    <div class="upload-icon">🏭</div>
+                    <div class="upload-text">Отчёт 2 - выгрузка из <strong>содержимое ячеек</strong></div>
+                    <div class="upload-hint">Фактическое наличие на складе: зоны, ячейки, паллеты</div>
+                    <div class="upload-status" id="statusWarehouse">Файл не загружен</div>
+                    <input type="file" id="fileWarehouse" accept=".xlsx,.xls" hidden>
+                </div>
+            </div>
+            <div class="upload-waiting" id="uploadWaiting"></div>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p id="loadingText">Обработка отчётов...</p>
+        </div>
+
+        <div class="dashboard" id="dashboard">
+            <!-- ============ Показатели, аномалии и графики ============ -->
+            <section>
+                <div class="stats-grid" id="statsGrid"></div>
+
+
+
+                <div class="charts-row">
+                    <div class="chart-container">
+                        <div class="chart-title">📉 Аномальные артикулы по отделам, SKU</div>
+                        <div class="chart-canvas-wrap">
+                            <canvas id="deptChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <div class="chart-title">🗺️ Аномальные артикулы по зонам склада, SKU</div>
+                        <div class="chart-canvas-wrap">
+                            <canvas id="zoneChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <div class="chart-title">📍 Топ-10 ячеек по аномальным артикулам, SKU</div>
+                        <div class="chart-canvas-wrap">
+                            <canvas id="cellChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="split-layout">
+                    <div class="panel">
+                        <div class="panel-header">
+                            <span>⚠️ Список аномалий</span>
+                            <span class="ph-meta" id="anomalyListInfo">-</span>
+                            <div class="list-actions">
+                                <button class="btn btn-filter" id="foundOnlyBtn" onclick="setListMode('found')" hidden>Только найденные</button>
+                                <button class="btn btn-filter" id="missingOnlyBtn" onclick="setListMode('missing')" hidden>Нет на складе</button>
+                                <button class="btn btn-filter" id="foundToggle" onclick="showAllAnomalies()">Показать всё</button>
+                            </div>
+                        </div>
+                        <div class="art-list" id="anomalyList"></div>
+                    </div>
+                    <div class="panel">
+                        <div class="panel-header">
+                            <span id="detailTitle">🔎 Детализация артикула</span>
+                            <span class="ph-meta" id="detailActions"></span>
+                        </div>
+                        <div class="panel-body" id="detailBody">
+                            <div class="empty-state">
+                                <div class="es-icon">👈</div>
+                                Выберите артикул в списке слева, чтобы увидеть, где искать его на складе
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+
+        <div class="footer" data-service-footer data-title="Аномалии склада" data-version-service="anomalies"
+            data-mail-subject="Аномалии склада"></div>
+    </div>
+
+    <!-- Модальное окно: информация -->
+    <div class="modal-overlay" id="infoModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>📋 Информация и инструкция</h3>
+                <button class="modal-close" onclick="toggleModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="instruction-section">
+                    <h4>📥 Как получить данные</h4>
+                    <ol class="instruction-steps">
+                        <li>
+                            <strong>Отчёт 1 - «Список аномалий запаса»</strong>
+                            Выгрузите список аномальных артикулов из Power BI: <code>Экспорт в Excel</code>.
+                            В файле нужны колонки «Артикул», «В торговом зале», «C3» и «Экспо».
+                        </li>
+                        <li>
+                            <strong>Отчёт 2 - выгрузка из содержимое ячеек</strong>
+                            В WMS Navision откройте <code>Содержимое ячеек (расширенное)</code>, выделите данные
+                            <code>Ctrl+A</code> и скопируйте их <code>Ctrl+Shift+C</code>.
+                        </li>
+                        <li>
+                            <strong>Сохраните выгрузку</strong>
+                            Вставьте данные в новый файл Excel (<code>Ctrl+V</code>), заранее отформатируйте столбец
+                            <code>SSCC</code> как текст и сохраните файл.
+                        </li>
+                        <li>
+                            <strong>Загрузите оба отчёта</strong>
+                            Перетащите файлы в области загрузки. Анализ запустится только после загрузки обоих
+                            отчётов - или нажмите «Загрузить пример из папки src».
+                        </li>
+                    </ol>
+                </div>
+                <div class="instruction-section">
+                    <h4>🔗 Как работает слияние</h4>
+                    <ol class="instruction-steps">
+                        <li>
+                            <strong>Сопоставление по коду</strong>
+                            Артикул из отчёта 1 ищется в отчёте 2 по колонке <code>LM Код</code>.
+                        </li>
+                        <li>
+                            <strong>Адреса хранения</strong>
+                            Для найденного артикула показываются все адреса: зона, ячейка, основной адрес, тип
+                            ячейки, наличие, свободно, в подборе, паллета и сумма.
+                        </li>
+                        <li>
+                            <strong>Отклонения по магазину</strong>
+                            «В торговом зале», C3, экспо и отрицательная доступность показываются отдельно
+                            и не суммируются между собой.
+                        </li>
+                        <li>
+                            <strong>Позиции без находок</strong>
+                            Артикулы, которых нет на складе, отделены в списке разделителем
+                            «❓ Не найдены на складе» - искать их физически негде.
+                        </li>
+                    </ol>
+                </div>
+                <div class="info-cards">
+                    <div class="info-card">
+                        <div class="info-card-icon">💾</div>
+                        <h5>Сохранение данных</h5>
+                        <p>Отчёты хранятся локально в браузере (IndexedDB) до ручной очистки и восстанавливаются после
+                            перезагрузки страницы.</p>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-card-icon">📊</div>
+                        <h5>Аналитика</h5>
+                        <p>Три показателя и три графика в SKU: аномальные артикулы по отделам, по зонам склада
+                            и топ-10 ячеек.</p>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-card-icon">📋</div>
+                        <h5>Работа с адресами</h5>
+                        <p>Копирование адресов в буфер и печатное задание для сборщика по выбранному артикулу.</p>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-card-icon">🔒</div>
+                        <h5>Безопасность</h5>
+                        <p>Все данные обрабатываются локально в вашем браузере и не передаются на внешние серверы.</p>
+                    </div>
+                </div>
+                <h5 class="important-header">⚠️ Важно знать</h5>
+                <div class="warning-box">
+                    <h5>⚠️ Нужны оба отчёта</h5>
+                    <p>Пока загружен только один файл, показатели и список не строятся: без содержимого ячеек нельзя
+                        определить, где физически лежит аномальный артикул.</p>
+                </div>
+                <div class="warning-box">
+                    <h5>📄 SSCC - текстом</h5>
+                    <p>При вставке выгрузки WMS отформатируйте столбец SSCC как текст. Иначе длинные номера искажаются и становятся не актуальными при разборе.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно: задание для сборщика -->
+    <div class="modal-overlay" id="taskModal">
+        <div class="modal-content" style="max-width: 1000px">
+            <div class="modal-header">
+                <h3>📋 Задание для сборщика</h3>
+                <button class="modal-close" onclick="closeTaskModal()">✕</button>
+            </div>
+            <div class="modal-body" id="taskBody"></div>
+            <div class="modal-header task-actions">
+                <button class="btn btn-secondary" onclick="copyTask()">📋 Скопировать</button>
+                <button class="btn btn-export" onclick="exportTask()">⬇ Excel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* =====================================================
+           Сервис: Аномалии склада - логика
+           1) «Список аномалий запаса»  - артикулы и отклонения
+           2) «Содержимое ячеек» (Книга1) - фактическое наличие на адресах
+           Слияние по артикулу (Артикул ↔ LM Код)
+           ===================================================== */
+
+        const IDB_NAME = 'lemanapro_anomalies';
+        const IDB_STORE = 'kv';
+        const IDB_VERSION = 1;
+        const KEY_ANOMALIES = 'anomalies_report';
+        const KEY_WAREHOUSE = 'warehouse_report';
+
+        const ANOMALY_KEYS = ['store', 'dept', 'art', 'gamma', 'name', 'theor', 'avail', 'hall',
+            'resK', 'resV', 'rm', 'em', 'rd', 'buf', 'c3', 'expo'];
+        const WAREHOUSE_KEYS = ['pb', 'addr', 'zone', 'cell', 'cellType', 'dept', 'name', 'lm',
+            'logTop', 'top', 'gamma', 'avs', 'avsDate', 'ei', 'avail', 'qty', 'pick', 'lock',
+            'sscc', 'mono', 'sum', 'comment'];
+
+        const ROWS_PER_PAGE = 50;
+
+        let idb = null;
+        let storageAnomalies = null;
+        let storageWarehouse = null;
+
+        let anomalyRows = [];
+        let warehouseRows = [];
+        let anomalyMeta = [];
+        let anomalyFileName = '';
+        let warehouseFileName = '';
+        let sessionOnly = false;
+
+        let warehouseIndex = new Map();
+        let filteredAnomalies = [];
+        let selectedArt = null;
+        let charts = {};
+        let listMode = 'found';
+        let listFiltersShown = false;
+
+        /* ---------- Форматирование ---------- */
+
+        function formatCount(value) {
+            return (Number(value) || 0).toLocaleString('ru-RU');
+        }
+
+        function formatMoney(value) {
+            const n = Number(value) || 0;
+            return n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₽';
+        }
+
+        function formatMoneyShort(value) {
+            const n = Number(value) || 0;
+            const abs = Math.abs(n);
+            if (abs >= 1e9) return (n / 1e9).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' млрд ₽';
+            if (abs >= 1e6) return (n / 1e6).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' млн ₽';
+            if (abs >= 1e3) return (n / 1e3).toLocaleString('ru-RU', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' тыс ₽';
+            return formatMoney(n);
+        }
+
+        function formatQty(value) {
+            const n = Number(value) || 0;
+            return n.toLocaleString('ru-RU', { maximumFractionDigits: 3 }) + ' шт.';
+        }
+
+        function truncate(text, max) {
+            const str = String(text || '');
+            return str.length > max ? str.slice(0, max - 1) + '…' : str;
+        }
+
+        /**
+         * Разбирает число из выгрузки Power BI:
+         * «−47», «-0.001», «103.5», «1,5», «431,873.44».
+         */
+        function parseNum(value) {
+            if (value === null || value === undefined || value === '') return null;
+            if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+            if (value instanceof Date) {
+                // В исходных файлах встречаются ячейки-суммы с «дата-форматом»:
+                // возвращаем исходное число (серийный номер Excel), а не объект Date.
+                // Формула совпадает с обратной к parseDateCell (эпоха Excel - 30.12.1899).
+                const days = Math.round((Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate())
+                    - Date.UTC(1899, 11, 30)) / 86400000) + 1;
+                return Number.isFinite(days) ? days : null;
+            }
+            let s = String(value).trim()
+                .replace(/[\u2212\u2013\u2014]/g, '-')
+                .replace(/[\u00a0\u202f\s]/g, '')
+                .replace(/'/g, '');
+            if (!s) return null;
+            const negative = /^\(.*\)$/.test(s);
+            if (negative) s = s.slice(1, -1);
+            s = s.replace(/[^\d,.\-+]/g, '');
+            if (!s || !/\d/.test(s)) return null;
+            const hasComma = s.includes(',');
+            const hasDot = s.includes('.');
+            if (hasComma && hasDot) {
+                s = s.lastIndexOf(',') > s.lastIndexOf('.')
+                    ? s.replace(/\./g, '').replace(',', '.')
+                    : s.replace(/,/g, '');
+            } else if (hasComma) {
+                const parts = s.split(',');
+                const isThousands = parts.length === 2 && parts[1].length === 3 && s.replace(/[-,]/g, '').length > 4;
+                s = isThousands ? s.replace(',', '') : s.replace(',', '.');
+            }
+            const num = Number(s);
+            if (!Number.isFinite(num)) return null;
+            return negative ? -num : num;
+        }
+
+        /**
+         * Читает первый лист книги в массив строк без преобразования дат:
+         * cellDates: false нужен, потому что в выгрузке встречаются ячейки-суммы
+         * с «дата-форматом» (иначе значение 31260 ₽ превращается в объект Date).
+         */
+        function readWorkbookRows(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const data = new Uint8Array(event.target.result);
+                        const workbook = XLSX.read(data, { type: 'array', cellDates: false });
+                        if (!workbook.SheetNames || !workbook.SheetNames.length) {
+                            reject(new Error('Файл не содержит листов'));
+                            return;
+                        }
+                        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                        resolve(XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: null }));
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+                reader.onerror = () => reject(new Error('Ошибка чтения файла'));
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        /** Форматирует серийный номер Excel как дату. */
+        function formatExcelDate(value) {
+            const num = parseNum(value);
+            if (num === null || num < 20000 || num > 60000) return value ? String(value) : '';
+            const date = new Date(Math.round((num - 25569) * 86400000));
+            if (isNaN(date.getTime())) return String(value);
+            return date.toLocaleDateString('ru-RU');
+        }
+
+        /* ---------- Разбор отчёта 1: список аномалий запаса ---------- */
+
+        function parseAnomalyReport(json) {
+            if (!Array.isArray(json) || json.length === 0) throw new Error('Файл не содержит данных');
+
+            let headerIndex = -1;
+            for (let i = 0; i < Math.min(json.length, 60); i++) {
+                const row = json[i] || [];
+                if (row.some(cell => String(cell || '').trim() === 'Артикул')) { headerIndex = i; break; }
+            }
+            if (headerIndex < 0) throw new Error('Не найдена строка заголовков: ожидается колонка «Артикул»');
+
+            const headers = json[headerIndex].map(cell => String(cell || '').trim());
+            const col = {
+                store: findColumnIndex(headers, ['Магазин']),
+                dept: findColumnIndex(headers, ['Отдел']),
+                art: findColumnIndex(headers, ['Артикул']),
+                gamma: findColumnIndex(headers, ['Гамма']),
+                name: findColumnIndex(headers, ['Наименование товара', 'Наименование']),
+                theor: findColumnIndex(headers, ['Теор. запас']),
+                avail: findColumnIndex(headers, ['Доступно для продажи']),
+                hall: findColumnIndex(headers, ['В торговом зале']),
+                resK: findColumnIndex(headers, ['Резерв для клиентов']),
+                resV: findColumnIndex(headers, ['Резерв для возврата']),
+                rm: findColumnIndex(headers, ['На RM']),
+                em: findColumnIndex(headers, ['На ЕМ']),
+                rd: findColumnIndex(headers, ['На RD']),
+                buf: findColumnIndex(headers, ['буфер склада', 'Буфер склада']),
+                c3: findColumnIndex(headers, ['C3']),
+                expo: findColumnIndex(headers, ['Экспо'])
+            };
+            if (col.art < 0) throw new Error('В отчёте нет обязательной колонки «Артикул»');
+            if (col.hall < 0) throw new Error('В отчёте нет обязательной колонки «В торговом зале»');
+
+            const meta = [];
+            for (let i = 0; i < headerIndex; i++) {
+                const row = json[i] || [];
+                const text = row.filter(cell => cell !== null && cell !== undefined && cell !== '')
+                    .map(cell => String(cell).trim()).filter(Boolean).join(' | ');
+                if (text) meta.push(text);
+            }
+
+            const rows = [];
+            for (let i = headerIndex + 1; i < json.length; i++) {
+                const row = json[i] || [];
+                if (!row.some(cell => cell !== null && cell !== undefined && cell !== '')) continue;
+                const text = key => col[key] >= 0 ? String(row[col[key]] == null ? '' : row[col[key]]).trim() : '';
+                const num = key => col[key] >= 0 ? parseNum(row[col[key]]) : null;
+                const art = text('art');
+                if (!art) continue;
+                const record = {
+                    store: text('store'),
+                    dept: text('dept'),
+                    art: art,
+                    gamma: text('gamma'),
+                    name: text('name'),
+                    theor: num('theor'),
+                    avail: num('avail'),
+                    hall: num('hall'),
+                    resK: num('resK'),
+                    resV: num('resV'),
+                    rm: num('rm'),
+                    em: num('em'),
+                    rd: num('rd'),
+                    buf: num('buf'),
+                    c3: num('c3'),
+                    expo: num('expo')
+                };
+                record.deficit = Math.abs(Math.min(record.hall || 0, 0));
+                record.c3Deficit = Math.abs(Math.min(record.c3 || 0, 0));
+                record.expoSurplus = Math.max(record.expo || 0, 0);
+                record.availDeficit = Math.abs(Math.min(record.avail || 0, 0));
+                rows.push(record);
+            }
+            if (!rows.length) throw new Error('В отчёте не найдено строк с артикулами');
+            return { rows: rows, meta: meta };
+        }
+
+        /* ---------- Разбор отчёта 2: содержимое ячеек ---------- */
+
+        function parseWarehouseReport(json) {
+            if (!Array.isArray(json) || json.length === 0) throw new Error('Файл не содержит данных');
+
+            let headerIndex = -1;
+            for (let i = 0; i < Math.min(json.length, 30); i++) {
+                const row = json[i] || [];
+                const text = row.map(cell => String(cell || '').trim().toUpperCase()).join(' ');
+                if (text.includes('LM КОД') && text.includes('ЯЧЕЙКА')) { headerIndex = i; break; }
+            }
+            if (headerIndex < 0) headerIndex = 0;
+
+            const headers = json[headerIndex].map(cell => String(cell || '').trim());
+            const col = {
+                pb: findColumnIndex(headers, ['Picking Box']),
+                addr: findColumnIndex(headers, ['Осн. адрес', 'Основной адрес']),
+                zone: findColumnIndex(headers, ['ЗОНА', 'Зона']),
+                cell: findColumnIndex(headers, ['ЯЧЕЙКА', 'Ячейка']),
+                cellType: findColumnIndex(headers, ['ЯЧЕЙКА ТИП', 'Тип ячейки']),
+                dept: findColumnIndex(headers, ['ОТДЕЛ', 'Отдел']),
+                name: findColumnIndex(headers, ['ОПИСАНИЕ', 'Описание']),
+                lm: findColumnIndex(headers, ['LM Код', 'LM КОД', 'ЛМ код']),
+                logTop: findColumnIndex(headers, ['ЛОГ. ТОП']),
+                top: findColumnIndex(headers, ['ТОП']),
+                gamma: findColumnIndex(headers, ['Гамма']),
+                avs: findColumnIndex(headers, ['AVS']),
+                avsDate: findColumnIndex(headers, ['Дата AVS']),
+                ei: findColumnIndex(headers, ['ЕИ', 'Ед.измерения', 'Ед. измерения']),
+                avail: findColumnIndex(headers, ['СВОБОДНО', 'Свободно']),
+                qty: findColumnIndex(headers, ['НАЛИЧИЕ', 'Наличие']),
+                pick: findColumnIndex(headers, ['В ПОДБОРЕ', 'В подборе']),
+                lock: findColumnIndex(headers, ['ЗАБЛОКИРОВАНО', 'Заблокировано']),
+                sscc: findColumnIndex(headers, ['SSCC']),
+                mono: findColumnIndex(headers, ['МОНО?', 'МОНО']),
+                sum: findColumnIndex(headers, ['Сумма']),
+                comment: findColumnIndex(headers, ['Комментарий к паллете', 'Комментарий'])
+            };
+            if (col.lm < 0) throw new Error('В отчёте нет обязательной колонки «LM Код»');
+
+            const rows = [];
+            for (let i = headerIndex + 1; i < json.length; i++) {
+                const row = json[i] || [];
+                if (!row.some(cell => cell !== null && cell !== undefined && cell !== '')) continue;
+                const text = key => col[key] >= 0 ? String(row[col[key]] == null ? '' : row[col[key]]).trim() : '';
+                const num = key => col[key] >= 0 ? parseNum(row[col[key]]) : null;
+                const lm = text('lm');
+                if (!lm) continue;
+
+                let sscc = text('sscc');
+                let comment = text('comment');
+                // В колонке SSCC иногда попадают текстовые комментарии («Всего в 2 паллетах.»)
+                if (sscc && !/^\d{6,}$/.test(sscc)) {
+                    if (!comment) comment = sscc;
+                    sscc = '';
+                }
+
+                rows.push({
+                    pb: text('pb'),
+                    addr: text('addr'),
+                    zone: text('zone') || '-',
+                    cell: text('cell') || '-',
+                    cellType: text('cellType'),
+                    dept: text('dept'),
+                    name: text('name'),
+                    lm: lm,
+                    logTop: text('logTop'),
+                    top: text('top'),
+                    gamma: text('gamma'),
+                    avs: text('avs'),
+                    avsDate: text('avsDate'),
+                    ei: text('ei'),
+                    avail: num('avail'),
+                    qty: num('qty'),
+                    pick: num('pick'),
+                    lock: num('lock'),
+                    sscc: sscc,
+                    mono: text('mono'),
+                    sum: num('sum'),
+                    comment: comment
+                });
+            }
+            if (!rows.length) throw new Error('В отчёте не найдено позиций с LM-кодом');
+            return { rows: rows };
+        }
+
+        /* ---------- Индексы и агрегаты ---------- */
+
+        function buildIndexes() {
+            warehouseIndex = new Map();
+            warehouseRows.forEach(row => {
+                const key = row.lm;
+                if (!warehouseIndex.has(key)) warehouseIndex.set(key, []);
+                warehouseIndex.get(key).push(row);
+            });
+        }
+
+        function getWarehouseFor(art) {
+            return warehouseIndex.get(art) || [];
+        }
+
+        function getAnomaly(art) {
+            return anomalyRows.find(row => row.art === art) || null;
+        }
+
+        function anomalyZones(record) {
+            const zones = [];
+            getWarehouseFor(record.art).forEach(row => { if (!zones.includes(row.zone)) zones.push(row.zone); });
+            return zones;
+        }
+
+        function anomalyWarehouseStats(record) {
+            const rows = getWarehouseFor(record.art);
+            let qty = 0, avail = 0, sum = 0;
+            const cells = new Set();
+            rows.forEach(row => {
+                qty += row.qty || 0;
+                avail += row.avail || 0;
+                sum += row.sum || 0;
+                cells.add(row.zone + ' · ' + row.cell);
+            });
+            return { rows: rows, qty: qty, avail: avail, sum: sum, cells: cells.size };
+        }
+
+        function isFound(record) {
+            return getWarehouseFor(record.art).length > 0;
+        }
+
+        /* ---------- Список аномалий ---------- */
+
+        /**
+         * Готовит список аномалий: сортировка по отклонению «В торговом зале»
+         * (по убыванию). Фильтров в сервисе нет - отчёт небольшой, а приоритетные
+         * позиции (найденные на складе) показываются первыми.
+         */
+        function buildAnomalyList() {
+            filteredAnomalies = [...anomalyRows].sort((a, b) => (b.deficit || 0) - (a.deficit || 0));
+        }
+
+        /* ---------- Рендеринг ---------- */
+
+        function renderAll() {
+            buildAnomalyList();
+            renderStats();
+            renderCharts();
+            renderAnomalyList();
+            renderDetail();
+        }
+
+        function renderStats() {
+            const grid = document.getElementById('statsGrid');
+            if (!grid) return;
+            const rows = filteredAnomalies;
+            let whQty = 0, whSum = 0, cells = 0;
+            let found = 0;
+            const cellSet = new Set();
+            rows.forEach(record => {
+                const stats = anomalyWarehouseStats(record);
+                whQty += stats.qty;
+                whSum += stats.sum;
+                if (stats.rows.length) {
+                    found++;
+                    stats.rows.forEach(row => cellSet.add(row.zone + ' · ' + row.cell));
+                }
+            });
+            cells = cellSet.size;
+
+            grid.innerHTML = `
+                <div class="stat-card avs-critical">
+                    <div class="stat-icon">📦</div>
+                    <div class="stat-value">${formatCount(rows.length)}</div>
+                    <div class="stat-label">Аномальных артикулов</div>
+                    <div class="stat-sublabel">${formatCount(new Set(rows.map(r => r.art)).size)} уникальных</div>
+                </div>
+                <div class="stat-card avs-normal">
+                    <div class="stat-icon">✅</div>
+                    <div class="stat-value">${formatCount(found)}</div>
+                    <div class="stat-label">Найдено на складе</div>
+                    <div class="stat-sublabel">${rows.length ? Math.round(found / rows.length * 100) : 0}% аномалий · адресов: ${formatCount(cells)}</div>
+                </div>
+                <div class="stat-card avs-warning">
+                    <div class="stat-icon">🏭</div>
+                    <div class="stat-value">${formatCount(whQty)}</div>
+                    <div class="stat-label">На складе, шт.</div>
+                    <div class="stat-sublabel">${formatMoneyShort(whSum)}</div>
+                </div>`;
+        }
+
+        function chartBase() {
+            return {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 300 },
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { boxWidth: 12, boxHeight: 12, padding: 10, font: { size: 10 } }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => {
+                                const label = ctx.dataset && ctx.dataset.label ? ctx.dataset.label + ': ' : '';
+                                return label + formatCount(ctx.raw);
+                            }
+                        }
+                    }
+                }
+            };
+        }
+
+        function createChart(canvasId, config) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return null;
+            const existing = Chart.getChart(canvas);
+            if (existing) existing.destroy();
+            return new Chart(canvas, config);
+        }
+
+        function renderCharts() {
+            const rows = filteredAnomalies;
+            /* Палитра графиков - как в «AVS Контроль» */
+            const avsPalette = ['#94a3b8', '#f87171', '#fbbf77', '#f59e42', '#34d399', '#10b981',
+                '#14b8a6', '#60a5fa', '#a78bfa', '#f472b6', '#fb923c', '#818cf8',
+                '#2dd4bf', '#c084fc', '#fb7185'];
+            const zonePalette = ['#78350f', '#b45309', '#d97706', '#059669', '#0d9488'];
+            const cellPalette = ['#b45309', '#d97706', '#f59e0b', '#059669', '#0d9488'];
+
+            /* Аномальные артикулы по отделам, SKU */
+            const deptMap = new Map();
+            rows.forEach(record => {
+                if (!record.dept) return;
+                const arts = deptMap.get(record.dept) || new Set();
+                arts.add(record.art);
+                deptMap.set(record.dept, arts);
+            });
+            const deptItems = [...deptMap.entries()]
+                .map(([dept, arts]) => [dept, arts.size])
+                .sort((a, b) => b[1] - a[1]);
+            charts.dept = createChart('deptChart', {
+                type: 'bar',
+                data: {
+                    labels: deptItems.map(item => item[0]),
+                    datasets: [{
+                        label: 'SKU (артикулов)',
+                        data: deptItems.map(item => item[1]),
+                        backgroundColor: deptItems.map((_, index) => avsPalette[index % avsPalette.length]),
+                        borderRadius: 4
+                    }]
+                },
+                options: Object.assign(chartBase(), {
+                    indexAxis: 'x',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: ctx => 'Артикулов: ' + formatCount(ctx.raw) + ' SKU' } }
+                    },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+                        y: { beginAtZero: true, ticks: { callback: v => formatCount(v) }, grid: { color: '#e2e8f0' } }
+                    }
+                })
+            });
+
+            /* Зоны склада, SKU */
+            const zoneMap = new Map();
+            rows.forEach(record => {
+                getWarehouseFor(record.art).forEach(row => {
+                    const arts = zoneMap.get(row.zone) || new Set();
+                    arts.add(record.art);
+                    zoneMap.set(row.zone, arts);
+                });
+            });
+            const zoneItems = [...zoneMap.entries()]
+                .map(([zone, arts]) => [zone, arts.size])
+                .sort((a, b) => b[1] - a[1]);
+            charts.zone = createChart('zoneChart', {
+                type: 'pie',
+                data: {
+                    labels: zoneItems.map(item => item[0]),
+                    datasets: [{
+                        label: 'SKU (артикулов)',
+                        data: zoneItems.map(item => item[1]),
+                        backgroundColor: zoneItems.map((_, index) => zonePalette[index % zonePalette.length]),
+                        borderColor: '#ffffff',
+                        borderWidth: 2
+                    }]
+                },
+                options: Object.assign(chartBase(), {
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { boxWidth: 12, boxHeight: 12, padding: 8, font: { size: 10 } }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => {
+                                    const total = ctx.dataset.data.reduce((sum, value) => sum + value, 0);
+                                    const percent = total ? Math.round(ctx.raw / total * 100) : 0;
+                                    return `${ctx.label}: ${formatCount(ctx.raw)} SKU (${percent}%)`;
+                                }
+                            }
+                        }
+                    }
+                })
+            });
+
+            /* Топ-10 ячеек, SKU */
+            const cellMap = new Map();
+            rows.forEach(record => {
+                getWarehouseFor(record.art).forEach(row => {
+                    const key = row.zone + ' · ' + row.cell;
+                    const arts = cellMap.get(key) || new Set();
+                    arts.add(record.art);
+                    cellMap.set(key, arts);
+                });
+            });
+            const cellItems = [...cellMap.entries()]
+                .map(([key, arts]) => ({ key: key, arts: arts.size }))
+                .sort((a, b) => b.arts - a.arts)
+                .slice(0, 10);
+            charts.cell = createChart('cellChart', {
+                type: 'bar',
+                data: {
+                    labels: cellItems.map(item => item.key),
+                    datasets: [{
+                        label: 'SKU (артикулов)',
+                        data: cellItems.map(item => item.arts),
+                        backgroundColor: cellItems.map((_, index) => cellPalette[index % cellPalette.length]),
+                        borderRadius: 4
+                    }]
+                },
+                options: Object.assign(chartBase(), {
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: ctx => 'Артикулов: ' + formatCount(ctx.raw) + ' SKU' } }
+                    },
+                    scales: {
+                        x: { beginAtZero: true, ticks: { callback: v => formatCount(v) }, grid: { color: '#e2e8f0' } },
+                        y: { grid: { display: false }, ticks: { font: { size: 10 } } }
+                    }
+                })
+            });
+
+        }
+
+        function renderAnomalyList() {
+            const list = document.getElementById('anomalyList');
+            if (!list) return;
+            const info = document.getElementById('anomalyListInfo');
+            const foundBtn = document.getElementById('foundOnlyBtn');
+            const missingBtn = document.getElementById('missingOnlyBtn');
+            const toggle = document.getElementById('foundToggle');
+
+            const foundRows = filteredAnomalies.filter(isFound);
+            const missingRows = filteredAnomalies.filter(record => !isFound(record));
+            const visible = listMode === 'found'
+                ? foundRows
+                : listMode === 'missing'
+                    ? missingRows
+                    : foundRows.concat(missingRows);
+
+            if (info) {
+                if (listMode === 'found') {
+                    info.textContent = `найдено на складе: ${formatCount(foundRows.length)} из ${formatCount(filteredAnomalies.length)}`;
+                } else if (listMode === 'missing') {
+                    info.textContent = `не найдено на складе: ${formatCount(missingRows.length)} из ${formatCount(filteredAnomalies.length)}`;
+                } else {
+                    info.textContent = `${formatCount(foundRows.length)} найдено · ${formatCount(missingRows.length)} не найдено`;
+                }
+            }
+
+            if (foundBtn) {
+                foundBtn.hidden = !listFiltersShown;
+                foundBtn.classList.toggle('active', listFiltersShown && listMode === 'found');
+            }
+            if (missingBtn) {
+                missingBtn.hidden = !listFiltersShown;
+                missingBtn.classList.toggle('active', listFiltersShown && listMode === 'missing');
+            }
+            if (toggle) {
+                toggle.classList.toggle('active', listFiltersShown && listMode === 'all');
+            }
+
+            if (!visible.length) {
+                const emptyText = listMode === 'missing'
+                    ? 'Все аномалии найдены на складе'
+                    : listMode === 'found'
+                        ? 'Аномалий, найденных на складе, нет'
+                        : 'Нет аномалий по выбранным фильтрам';
+                list.innerHTML = `<div class="empty-state"><div class="es-icon">✅</div>${emptyText}</div>`;
+                return;
+            }
+
+            const itemHtml = record => {
+                const zones = anomalyZones(record);
+                const stats = anomalyWarehouseStats(record);
+                const zoneChips = zones.length
+                    ? zones.map(z => `<span class="badge badge-zone">${escapeHtml(z)}</span>`).join(' ')
+                    : '<span class="badge badge-warn">Не найден</span>';
+                return `<div class="art-item ${selectedArt === record.art ? 'active' : ''}" data-art="${escapeHtml(record.art)}" role="button" tabindex="0">
+                    <div class="ai-top"><span>${escapeHtml(record.art)}</span><span class="neg" title="В торговом зале">−${formatCount(record.deficit || 0)}</span></div>
+                    <div class="ai-name" title="${escapeHtml(record.name)}">${escapeHtml(record.name)}</div>
+                    <div class="ai-meta">
+                        ${stats.rows.length
+                            ? `<span class="badge badge-qty" title="Количество на складе по отчёту фактического наличия">${formatCount(stats.qty)} шт.</span>`
+                            : '<span class="badge badge-qty zero" title="На складе не найдено">0 шт.</span>'}
+                        <span class="badge">отд. ${escapeHtml(record.dept)}</span>
+                        ${zoneChips}
+                    </div>
+                </div>`;
+            };
+
+            let html = '';
+            if (listMode !== 'missing') {
+                html += foundRows.map(itemHtml).join('');
+            }
+            if (listMode === 'all' && missingRows.length) {
+                html += `<div class="list-divider">❓ Не найдены на складе - ${formatCount(missingRows.length)}</div>`;
+            }
+            if (listMode !== 'found') {
+                html += missingRows.map(itemHtml).join('');
+            }
+            list.innerHTML = html;
+        }
+
+        function renderDetail() {
+            const title = document.getElementById('detailTitle');
+            const body = document.getElementById('detailBody');
+            const actions = document.getElementById('detailActions');
+            if (!body) return;
+            const record = selectedArt ? getAnomaly(selectedArt) : null;
+            if (!record) {
+                if (title) title.textContent = '🔎 Детализация артикула';
+                if (actions) actions.innerHTML = '';
+                body.innerHTML = `<div class="empty-state"><div class="es-icon">👈</div>
+                    Выберите артикул в списке слева, чтобы увидеть, где искать его на складе</div>`;
+                return;
+            }
+            const stats = anomalyWarehouseStats(record);
+            if (title) title.textContent = `🔎 ${record.art} - ${truncate(record.name, 60)}`;
+            if (actions) {
+                actions.innerHTML = stats.rows.length
+                    ? `<button class="btn btn-export" onclick="copyAddresses()">📋 Копировать адреса</button>
+                       <button class="btn btn-export" onclick="openTaskModal()">🖨 Задание</button>`
+                    : '';
+            }
+
+            /* Если артикула нет в отчёте фактического наличия, остатки по зонам
+               показываем перечёркнутыми: в отчёте аномалий они ещё есть, но
+               физически на складе уже отсутствуют. */
+            const notOnWarehouse = stats.rows.length === 0;
+            const zoneHint = 'По отчёту фактического наличия этого количества на складе нет';
+            const zoneMetric = (label, value) => ({
+                label: label,
+                value: formatCount(value || 0),
+                cls: '',
+                gone: notOnWarehouse && (Number(value) || 0) !== 0,
+                hint: notOnWarehouse ? zoneHint : ''
+            });
+
+            const metrics = [
+                { label: 'Теор. запас', value: formatCount(record.theor || 0), cls: '' },
+                { label: 'Доступно', value: formatCount(record.avail || 0), cls: (record.avail || 0) < 0 ? 'neg' : '' },
+                { label: 'В торговом зале', value: formatCount(record.hall || 0), cls: 'neg' },
+                { label: 'C3', value: formatCount(record.c3 || 0), cls: (record.c3 || 0) < 0 ? 'neg' : '' },
+                { label: 'Экспо', value: formatCount(record.expo || 0), cls: 'pos' },
+                zoneMetric('На RM', record.rm),
+                zoneMetric('На ЕМ', record.em),
+                zoneMetric('На RD', record.rd),
+                zoneMetric('Буфер склада', record.buf),
+                { label: 'Резерв клиентов', value: formatCount(record.resK || 0), cls: '' },
+                { label: 'Резерв возврата', value: formatCount(record.resV || 0), cls: '' }
+            ];
+
+            const addressRows = stats.rows.map(row => `
+                <tr>
+                    <td><span class="badge badge-zone">${escapeHtml(row.zone)}</span></td>
+                    <td><b>${escapeHtml(row.cell)}</b></td>
+                    <td>${escapeHtml(row.addr || '-')}</td>
+                    <td>${escapeHtml(row.cellType || '-')}</td>
+                    <td>${escapeHtml(row.dept || '-')}</td>
+                    <td>${formatCount(row.qty || 0)}</td>
+                    <td>${formatCount(row.avail || 0)}</td>
+                    <td>${row.pick ? formatCount(row.pick) : '-'}</td>
+                    <td>${escapeHtml(row.sscc || (row.comment || '-'))}</td>
+                    <td>${formatMoney(row.sum || 0)}</td>
+                </tr>`).join('');
+
+            body.innerHTML = `
+                <div class="metric-strip">
+                    ${metrics.map(metric => `<div class="metric-box">
+                        <div class="mb-value ${metric.cls}${metric.gone ? ' mb-gone' : ''}"${metric.hint ? ` title="${escapeHtml(metric.hint)}"` : ''}>${metric.value}</div>
+                        <div class="mb-label">${metric.label}</div>
+                    </div>`).join('')}
+                </div>
+                ${stats.rows.length ? `
+                    <div class="section-title">🏭 Где искать на складе - ${stats.rows.length} ${pluralRecords(stats.rows.length)}</div>
+                    <div class="table-info-bar">
+                        <span>Итого: <strong>${formatQty(stats.qty)}</strong></span>
+                        <span>${formatMoney(stats.sum)} · адресов: ${formatCount(stats.cells)}</span>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Зона</th><th>Ячейка</th><th>Осн. адрес</th><th>Тип ячейки</th><th>ОТДЕЛ</th>
+                                    <th>Наличие</th><th>Свободно</th><th>В подборе</th><th>Паллета / комментарий</th><th>Σ ₽</th>
+                                </tr>
+                            </thead>
+                            <tbody>${addressRows}</tbody>
+                        </table>
+                    </div>`
+                    : `<div class="empty-state"><div class="es-icon">❓</div>
+                        Артикул не найден в файле из содержимое ячеек - искать физически негде.<br>
+                        В списке он остаётся под разделителем «Не найдены на складе».</div>`}`;
+        }
+
+        function pluralRecords(count) {
+            const mod10 = count % 10;
+            const mod100 = count % 100;
+            if (mod10 === 1 && mod100 !== 11) return 'позиция';
+            if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'позиции';
+            return 'позиций';
+        }
+
+        function copyAddresses() {
+            const record = selectedArt ? getAnomaly(selectedArt) : null;
+            if (!record) return;
+            const rows = getWarehouseFor(record.art);
+            if (!rows.length) { alert('По этому артикулу адресов нет'); return; }
+            const text = rows.map(row => [
+                record.art, record.name, row.zone, row.cell, row.addr || '', row.cellType || '',
+                row.qty || 0, row.avail === null ? '' : row.avail, row.sscc || row.comment || ''
+            ].join('\t')).join('\n');
+            copyText(text, 'Адреса скопированы в буфер обмена');
+        }
+
+        function copyText(text, message) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text)
+                    .then(() => showToast(message))
+                    .catch(() => fallbackCopy(text, message));
+            } else {
+                fallbackCopy(text, message);
+            }
+        }
+
+        function fallbackCopy(text, message) {
+            const area = document.createElement('textarea');
+            area.value = text;
+            area.style.position = 'fixed';
+            area.style.opacity = '0';
+            document.body.appendChild(area);
+            area.select();
+            try {
+                document.execCommand('copy');
+                showToast(message);
+            } catch (e) {
+                alert('Не удалось скопировать');
+            }
+            area.remove();
+        }
+
+        function showToast(message) {
+            let toast = document.getElementById('anomToast');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'anomToast';
+                toast.style.cssText = 'position:fixed;left:50%;bottom:26px;transform:translateX(-50%);' +
+                    'background:#22303f;color:#fff;padding:11px 20px;border-radius:10px;font-size:0.9em;' +
+                    'z-index:9999;box-shadow:0 6px 20px rgba(0,0,0,.25)';
+                document.body.appendChild(toast);
+            }
+            toast.textContent = message;
+            toast.style.display = 'block';
+            clearTimeout(toast._timer);
+            toast._timer = setTimeout(() => { toast.style.display = 'none'; }, 2600);
+        }
+
+        /* ---------- Задание для сборщика ---------- */
+
+        function buildTaskRows() {
+            const rows = [];
+            filteredAnomalies.forEach(record => {
+                anomalyWarehouseStats(record).rows.forEach(row => {
+                    rows.push({
+                        art: record.art,
+                        name: record.name,
+                        dept: record.dept,
+                        deficit: record.deficit,
+                        zone: row.zone,
+                        cell: row.cell,
+                        addr: row.addr || '-',
+                        cellType: row.cellType || '-',
+                        qty: row.qty || 0,
+                        sscc: row.sscc || row.comment || '-'
+                    });
+                });
+            });
+            return rows;
+        }
+
+        function openTaskModal() {
+            const rows = buildTaskRows();
+            if (!rows.length) { alert('Нет адресов для задания'); return; }
+            const body = document.getElementById('taskBody');
+            body.innerHTML = `
+                <div class="metric-strip">
+                    <div class="metric-box"><div class="mb-value">${formatCount(new Set(rows.map(r => r.art)).size)}</div><div class="mb-label">артикулов</div></div>
+                    <div class="metric-box"><div class="mb-value">${formatCount(rows.length)}</div><div class="mb-label">адресов</div></div>
+                    <div class="metric-box"><div class="mb-value">${formatCount(rows.reduce((s, r) => s + r.qty, 0))}</div><div class="mb-label">шт.</div></div>
+                    <div class="metric-box"><div class="mb-value">${formatCount(new Set(rows.map(r => r.zone)).size)}</div><div class="mb-label">зон</div></div>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead class="tr-background">
+                            <tr><th>Артикул</th><th>Наименование</th><th>Зона</th><th>Ячейка</th><th>Осн. адрес</th><th>Тип</th><th>Шт.</th><th>Паллета</th></tr>
+                        </thead>
+                        <tbody>
+                            ${rows.map(row => `<tr>
+                                <td><b>${escapeHtml(row.art)}</b></td>
+                                <td class="cell-name">${escapeHtml(row.name)}</td>
+                                <td>${escapeHtml(row.zone)}</td>
+                                <td><b>${escapeHtml(row.cell)}</b></td>
+                                <td>${escapeHtml(row.addr)}</td>
+                                <td>${escapeHtml(row.cellType)}</td>
+                                <td>${formatCount(row.qty)}</td>
+                                <td>${escapeHtml(row.sscc)}</td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>`;
+            document.getElementById('taskModal').classList.add('open');
+        }
+
+        function closeTaskModal() {
+            document.getElementById('taskModal').classList.remove('open');
+        }
+
+        function copyTask() {
+            const rows = buildTaskRows();
+            if (!rows.length) return;
+            const text = rows.map(row => [row.art, row.name, row.zone, row.cell, row.addr, row.qty].join('\t')).join('\n');
+            copyText(text, 'Задание скопировано в буфер обмена');
+        }
+
+        function exportTask() {
+            const rows = buildTaskRows();
+            if (!rows.length) { alert('Нет данных для экспорта'); return; }
+            const data = [['Артикул', 'Наименование', 'Зона', 'Ячейка', 'Осн. адрес', 'Тип ячейки', 'Шт.', 'Паллета']];
+            rows.forEach(row => data.push([row.art, row.name, row.zone, row.cell, row.addr, row.cellType, row.qty, row.sscc]));
+            exportRowsToXLSX(data, 'Задание', 'Задание_для_сборщика');
+        }
+
+        /* ---------- Загрузка файлов ---------- */
+
+        async function handleAnomalyFile(file) {
+            setLoading(true, 'Обработка отчёта «Аномалии запаса»...');
+            try {
+                const json = await readWorkbookRows(file);
+                const parsed = parseAnomalyReport(json);
+                anomalyRows = parsed.rows;
+                anomalyMeta = parsed.meta;
+                anomalyFileName = file.name;
+                document.getElementById('statusAnomalies').textContent = `✅ ${file.name} - ${formatCount(anomalyRows.length)} строк`;
+                document.getElementById('uploadAnomalies').classList.add('loaded');
+                afterFileLoaded();
+                await saveAnomalies();
+            } catch (error) {
+                alert('Ошибка загрузки отчёта аномалий: ' + error.message);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        async function handleWarehouseFile(file) {
+            setLoading(true, 'Обработка отчёта из содержимое ячеек...');
+            try {
+                const json = await readWorkbookRows(file);
+                const parsed = parseWarehouseReport(json);
+                warehouseRows = parsed.rows;
+                warehouseFileName = file.name;
+                document.getElementById('statusWarehouse').textContent = `✅ ${file.name} - ${formatCount(warehouseRows.length)} позиций`;
+                document.getElementById('uploadWarehouse').classList.add('loaded');
+                afterFileLoaded();
+                await saveWarehouse();
+            } catch (error) {
+                alert('Ошибка загрузки отчёта склада: ' + error.message);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        /**
+         * Отчёты загружаются независимо, но анализ запускается только когда
+         * загружены оба: без содержимого ячеек искать аномальные позиции негде.
+         */
+        function afterFileLoaded() {
+            const hasAnomalies = anomalyRows.length > 0;
+            const hasWarehouse = warehouseRows.length > 0;
+            const waiting = document.getElementById('uploadWaiting');
+
+            if (hasAnomalies && hasWarehouse) {
+                buildIndexes();
+                selectedArt = null;
+                showUpload(false);
+                showDashboard(true);
+                renderAll();
+                updateNotice();
+                if (waiting) waiting.classList.remove('active');
+                return;
+            }
+
+            // Загружен только один отчёт - ждём второй
+            showUpload(true);
+            showDashboard(false);
+            if (waiting) {
+                waiting.textContent = hasAnomalies
+                    ? '✅ Отчёт 1 «Список аномалий запаса» загружен. Для анализа нужен ещё отчёт 2 выгруженный из содержимое ячеек - где искать позиции на складе.'
+                    : '✅ Отчёт 2 загружен. Для анализа нужен ещё отчёт 1 «Список аномалий запаса» - список аномальных позиций.';
+                waiting.classList.add('active');
+            }
+            updateNotice();
+        }
+
+        function showAllAnomalies() {
+            listFiltersShown = true;
+            listMode = 'all';
+            renderAnomalyList();
+        }
+
+        function setListMode(mode) {
+            listMode = mode === 'missing' || mode === 'all' ? mode : 'found';
+            listFiltersShown = true;
+            renderAnomalyList();
+        }
+
+        function setLoading(show, text) {
+            const el = document.getElementById('loading');
+            if (el) el.classList.toggle('active', !!show);
+            const label = document.getElementById('loadingText');
+            if (label && text) label.textContent = text;
+        }
+
+        /* ---------- Хранение ---------- */
+
+        async function saveAnomalies() {
+            if (!storageAnomalies || !anomalyRows.length) return;
+            try {
+                await storageAnomalies.save(anomalyRows.map(record => ANOMALY_KEYS.map(key => record[key])),
+                    Date.now(), { fileName: anomalyFileName, meta: anomalyMeta, keys: ANOMALY_KEYS });
+                sessionOnly = false;
+            } catch (error) {
+                console.error('Ошибка сохранения отчёта аномалий:', error);
+                sessionOnly = true;
+            }
+            updateNotice();
+        }
+
+        async function saveWarehouse() {
+            if (!storageWarehouse || !warehouseRows.length) return;
+            try {
+                await storageWarehouse.save(warehouseRows.map(record => WAREHOUSE_KEYS.map(key => record[key])),
+                    Date.now(), { fileName: warehouseFileName, keys: WAREHOUSE_KEYS });
+                sessionOnly = false;
+            } catch (error) {
+                console.error('Ошибка сохранения отчёта склада:', error);
+                sessionOnly = true;
+            }
+            updateNotice();
+        }
+
+        async function loadSavedData() {
+            try {
+                if (storageAnomalies) {
+                    const payload = await storageAnomalies.load();
+                    if (payload && Array.isArray(payload.records) && payload.records.length) {
+                        const keys = (payload.meta && payload.meta.keys) || ANOMALY_KEYS;
+                        anomalyRows = payload.records.map(row => {
+                            const obj = {};
+                            keys.forEach((key, i) => { obj[key] = row[i]; });
+                            obj.deficit = Math.abs(Math.min(obj.hall || 0, 0));
+                            obj.c3Deficit = Math.abs(Math.min(obj.c3 || 0, 0));
+                            obj.expoSurplus = Math.max(obj.expo || 0, 0);
+                            obj.availDeficit = Math.abs(Math.min(obj.avail || 0, 0));
+                            return obj;
+                        });
+                        anomalyFileName = (payload.meta && payload.meta.fileName) || '';
+                        anomalyMeta = (payload.meta && payload.meta.meta) || [];
+                        document.getElementById('statusAnomalies').textContent = `✅ ${anomalyFileName || 'отчёт'} - ${formatCount(anomalyRows.length)} строк`;
+                        document.getElementById('uploadAnomalies').classList.add('loaded');
+                    }
+                }
+                if (storageWarehouse) {
+                    const payload = await storageWarehouse.load();
+                    if (payload && Array.isArray(payload.records) && payload.records.length) {
+                        const keys = (payload.meta && payload.meta.keys) || WAREHOUSE_KEYS;
+                        warehouseRows = payload.records.map(row => {
+                            const obj = {};
+                            keys.forEach((key, i) => { obj[key] = row[i]; });
+                            return obj;
+                        });
+                        warehouseFileName = (payload.meta && payload.meta.fileName) || '';
+                        document.getElementById('statusWarehouse').textContent = `✅ ${warehouseFileName || 'отчёт'} - ${formatCount(warehouseRows.length)} позиций`;
+                        document.getElementById('uploadWarehouse').classList.add('loaded');
+                    }
+                }
+                if (anomalyRows.length || warehouseRows.length) {
+                    // Анализ запускается только при наличии обоих отчётов
+                    afterFileLoaded();
+                }
+            } catch (error) {
+                console.error('Ошибка чтения данных из IndexedDB:', error);
+            }
+        }
+
+        function updateNotice() {
+            const notice = document.getElementById('dataNotice');
+            const title = document.getElementById('noticeTitle');
+            const info = document.getElementById('dataInfo');
+            const warning = document.getElementById('sessionWarning');
+            if (!notice || !title || !info) return;
+            notice.classList.add('active');
+            const parts = [];
+            if (anomalyRows.length) parts.push(`Аномалий: <strong>${formatCount(anomalyRows.length)}</strong>`);
+            if (warehouseRows.length) parts.push(`Склад: <strong>${formatCount(warehouseRows.length)}</strong>`);
+
+            const ready = anomalyRows.length > 0 && warehouseRows.length > 0;
+            if (!ready) {
+                notice.classList.remove('session');
+                title.textContent = '📄 Отчёт загружен - ждём второй';
+                info.innerHTML = parts.join(' • ') + ' | Анализ запустится после загрузки обоих отчётов';
+                if (warning) warning.classList.remove('active');
+                return;
+            }
+
+            if (sessionOnly) {
+                notice.classList.add('session');
+                title.textContent = '⚠️ Режим сессии (без сохранения)!';
+                info.innerHTML = parts.join(' • ') + ' • Данные будут удалены при закрытии страницы';
+                if (warning) warning.classList.add('active');
+            } else {
+                notice.classList.remove('session');
+                title.textContent = '💾 Данные сохранены!';
+                info.innerHTML = parts.join(' • ') + ' | Дата: <strong>' + new Date().toLocaleString('ru-RU') + '</strong>';
+                if (warning) warning.classList.remove('active');
+            }
+        }
+
+        async function doClearData() {
+            try {
+                // Удаляем только записи отчётов: база остаётся целой,
+                // поэтому следующая загрузка сохраняется без пересоздания БД.
+                if (idb) {
+                    await idb.delete(KEY_ANOMALIES);
+                    await idb.delete(KEY_WAREHOUSE);
+                }
+            } catch (error) {
+                console.error('Ошибка очистки IndexedDB:', error);
+            }
+            anomalyRows = [];
+            warehouseRows = [];
+            anomalyMeta = [];
+            anomalyFileName = '';
+            warehouseFileName = '';
+            selectedArt = null;
+            filteredAnomalies = [];
+            listMode = 'found';
+            listFiltersShown = false;
+            const foundBtn = document.getElementById('foundOnlyBtn');
+            const missingBtn = document.getElementById('missingOnlyBtn');
+            const foundToggle = document.getElementById('foundToggle');
+            if (foundBtn) { foundBtn.hidden = true; foundBtn.classList.remove('active'); }
+            if (missingBtn) { missingBtn.hidden = true; missingBtn.classList.remove('active'); }
+            if (foundToggle) foundToggle.classList.remove('active');
+            const waiting = document.getElementById('uploadWaiting');
+            if (waiting) {
+                waiting.textContent = '';
+                waiting.classList.remove('active');
+            }
+            document.getElementById('statusAnomalies').textContent = 'Файл не загружен';
+            document.getElementById('statusWarehouse').textContent = 'Файл не загружен';
+            document.getElementById('uploadAnomalies').classList.remove('loaded');
+            document.getElementById('uploadWarehouse').classList.remove('loaded');
+            document.getElementById('dataNotice').classList.remove('active');
+            document.getElementById('statsGrid').innerHTML = '';
+            document.getElementById('anomalyList').innerHTML = '';
+            document.getElementById('detailBody').innerHTML = '';
+            showUpload(true);
+            showDashboard(false);
+        }
+
+        /* ---------- Инициализация ---------- */
+
+        /* Высота правой панели с детализацией равна высоте левой колонки:
+           список задаёт размер, детализация не «прыгает» при выборе артикула. */
+        function setupSplitLayoutSync() {
+            const layout = document.querySelector('.split-layout');
+            if (!layout || layout.children.length < 2) return;
+            const left = layout.children[0];
+            const right = layout.children[1];
+            const stacked = window.matchMedia('(max-width: 900px)');
+
+            const sync = () => {
+                if (stacked.matches) {
+                    right.style.height = '';
+                    return;
+                }
+                const height = Math.round(left.getBoundingClientRect().height);
+                if (height > 0) right.style.height = height + 'px';
+            };
+
+            sync();
+            if (typeof ResizeObserver === 'function') {
+                new ResizeObserver(sync).observe(left);
+            }
+            if (stacked.addEventListener) {
+                stacked.addEventListener('change', sync);
+            } else {
+                window.addEventListener('resize', sync);
+            }
+        }
+
+        function initApp() {
+            idb = new IDBStore({ dbName: IDB_NAME, storeName: IDB_STORE, version: IDB_VERSION });
+            storageAnomalies = createReportStorage({ idb, key: KEY_ANOMALIES, wrapped: true });
+            storageWarehouse = createReportStorage({ idb, key: KEY_WAREHOUSE, wrapped: true });
+
+            setupUploadArea('uploadAnomalies', 'fileAnomalies', handleAnomalyFile);
+            setupUploadArea('uploadWarehouse', 'fileWarehouse', handleWarehouseFile);
+            setupEscapeToClose('infoModal', toggleModal);
+            setupEscapeToClose('taskModal', closeTaskModal);
+            setupSplitLayoutSync();
+
+            const list = document.getElementById('anomalyList');
+            if (list) {
+                list.addEventListener('click', event => {
+                    const item = event.target.closest('.art-item');
+                    if (!item) return;
+                    selectedArt = item.dataset.art;
+                    renderAnomalyList();
+                    renderDetail();
+                });
+            }
+
+            loadSavedData();
+        }
+
+        function toggleModal() {
+            const modal = document.getElementById('infoModal');
+            if (modal) modal.classList.toggle('open');
+        }
+
+        document.getElementById('infoModal')?.addEventListener('click', function (event) {
+            if (event.target === this) this.classList.remove('open');
+        });
+
+        document.getElementById('taskModal')?.addEventListener('click', function (event) {
+            if (event.target === this) this.classList.remove('open');
+        });
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initApp);
+        } else {
+            initApp();
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,11 @@
+{
+  "name": "logistics-analytics-portal",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Портал отчётов складской логистики: клиентская аналитика в браузере без сервера и сборки",
+  "scripts": {
+    "test": "node --test",
+    "test:utils": "node --test test/utils.test.js"
+  }
+}

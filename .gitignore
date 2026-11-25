@@ -1,0 +1,27 @@
+# Зависимости и локальные инструменты
+node_modules/
+.env
+.env.*
+
+# Операционные системы и редакторы
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Логи и временные файлы
+*.log
+npm-debug.log*
+.temp/
+.tmp/
+
+# Резервные копии вложенного git-репозитория
+.git-backups/
+
+# Локальные заметки с секретами: не коммитить
+not indexed/musthave.md
+
+# Примеры XLSX и локальная конфигурация не публикуются
+not indexed/samples_XLSX/
+opencode.json
