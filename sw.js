@@ -45,6 +45,7 @@ function runtimeName(version) {
 const SHELL = [
     './',
     './index.html',
+    './404.html',
     './manifest.webmanifest',
     './icon.svg',
     './icon-192x192.png',
@@ -231,6 +232,20 @@ async function matchCachedNavigation(req) {
     }
 }
 
+/**
+ * Отдаёт закэшированную страницу 404 с корректным статусом.
+ * @returns {Promise<Response|null>}
+ */
+async function cachedNotFound() {
+    const cached = await caches.match('./404.html');
+    if (!cached) return null;
+    return new Response(await cached.blob(), {
+        status: 404,
+        statusText: 'Not Found',
+        headers: { 'Content-Type': 'text/html; charset=utf-8' }
+    });
+}
+
 self.addEventListener('fetch', e => {
     const req = e.request;
     const url = req.url;
@@ -241,12 +256,14 @@ self.addEventListener('fetch', e => {
         if (new URL(url).origin !== location.origin) return;
     } catch (err) { return; }
 
-    // Навигация: сеть → кэш (точная страница или index.html сервиса) → портал
+    // Навигация: сеть → кэш (точная страница или index.html сервиса) → 404
     if (req.mode === 'navigate') {
         e.respondWith(
             Promise.resolve(checkForNewVersion())
                 .then(() => fetch(req, { cache: 'reload' }))
                 .then(res => {
+                    // Несуществующий адрес: отдаём страницу 404 с её статусом.
+                    if (res && res.status === 404) return res;
                     if (!res || !res.ok) throw new Error('Сеть вернула ошибку ' + (res ? res.status : ''));
                     const copy = res.clone();
                     caches.open(CACHE).then(c => c.put(req, copy));
@@ -255,7 +272,8 @@ self.addEventListener('fetch', e => {
                 .catch(async () => {
                     const cached = await matchCachedNavigation(req);
                     if (cached) return cached;
-                    return (await caches.match('./index.html')) || Response.error();
+                    // Офлайн или ошибка сети: показываем страницу 404, а не портал.
+                    return (await cachedNotFound()) || Response.error();
                 })
         );
         return;

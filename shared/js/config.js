@@ -7,7 +7,7 @@
    ===================================================== */
 
 self.PORTAL_CONFIG = Object.freeze({
-    version: '1.0.0',
+    version: '1.0.1',
     releaseDate: '25.11.2026',
     services: Object.freeze([
         Object.freeze({
