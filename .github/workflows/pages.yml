@@ -15,10 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -40,6 +37,25 @@ jobs:
           path: _site
           include-hidden-files: true
 
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment_retry.outputs.page_url }}
+    steps:
+      # Артефакт становится виден сервису артефактов с задержкой до десятков секунд
+      # (actions/deploy-pages#451), поэтому деплой отделён от сборки и ждёт.
+      - name: Wait for artifact visibility
+        run: sleep 20
+
       - name: Deploy to GitHub Pages
         id: deployment
+        continue-on-error: true
+        uses: actions/deploy-pages@v5
+
+      # Повтор безопасен: неудачный поиск артефакта не создаёт деплой.
+      - name: Deploy to GitHub Pages (retry)
+        id: deployment_retry
+        if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@v5
