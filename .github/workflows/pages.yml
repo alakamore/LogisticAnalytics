@@ -1,4 +1,4 @@
-name: Deploy to GitHub Pages
+name: Publish site to gh-pages
 
 on:
   push:
@@ -6,16 +6,14 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
   group: pages
   cancel-in-progress: true
 
 jobs:
-  build:
+  publish:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -27,35 +25,19 @@ jobs:
           cp index.html manifest.webmanifest sw.js robots.txt .nojekyll _site/
           cp icon.svg icon-192x192.png icon-512x512.png _site/
           cp -R shared Services _site/
+          echo 'lmbi.ru' > _site/CNAME
 
-      - name: Configure Pages
-        uses: actions/configure-pages@v6
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v5
-        with:
-          path: _site
-          include-hidden-files: true
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url || steps.deployment_retry.outputs.page_url }}
-    steps:
-      # Артефакт становится виден сервису артефактов с задержкой до десятков секунд
-      # (actions/deploy-pages#451), поэтому деплой отделён от сборки и ждёт.
-      - name: Wait for artifact visibility
-        run: sleep 20
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        continue-on-error: true
-        uses: actions/deploy-pages@v5
-
-      # Повтор безопасен: неудачный поиск артефакта не создаёт деплой.
-      - name: Deploy to GitHub Pages (retry)
-        id: deployment_retry
-        if: steps.deployment.outcome == 'failure'
-        uses: actions/deploy-pages@v5
+      # Публикация обычным git push в ветку gh-pages: не зависит от
+      # Pages deployment API, который отвечает 500 (actions/deploy-pages).
+      - name: Publish to gh-pages
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          cd _site
+          git init -q
+          git checkout -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -qm "deploy ${GITHUB_SHA}"
+          git push -f "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
