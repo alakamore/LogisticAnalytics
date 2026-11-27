@@ -51,11 +51,12 @@ const factory = new Function(
     `${idbCode}\n${commonCode}\n${scriptMatch[1]}\nreturn {
         anaParseWorkbook, anaHydrate, anaWeight, anaFilterRows,
         anaAggEmployees, anaAggDays, anaAggHours, anaTotals, anaShiftStats, anaShiftOfSlot,
-        anaFilterBySlots, anaRankComparator,
-        anaFilterOptionValues,
+        anaFilterBySlots, anaRankComparator, anaTableColumns,
+        anaFilterOptionValues, anaSlotsToHours, anaRate, anaFmtRate, anaFmtOpt,
+        anaProdComparator, anaProdSortLabel, ANA_PROD_SORT_OPTIONS,
         ANA_OP_CAT, ANA_WEIGHTS, ANA_TABS, ANA_CAT_ORDER, ANA_OPS_BY_CAT, ANA_CATEGORY_STATS,
         ANA_SLOT_FILTER_OPTIONS, ANA_SLOT_FILTER_DEFAULT,
-        ANA_FILTER_FIELDS, ANA_RANK_SORT_DEFAULT
+        ANA_FILTER_FIELDS, ANA_RANK_SORT_DEFAULT, ANA_RATE_MIN_SLOTS
     };`
 );
 const api = factory(config, fakeWindow, fakeDocument, config, undefined, undefined, XLSX, undefined);
@@ -106,10 +107,10 @@ function slotRows(ldap, cat, slots, ops, opts = {}) {
 
 /* ---------- Структура сервиса ---------- */
 
-test('analyseLogisticOperation: четыре вкладки, единая палитра и диаграммы', () => {
-    const labels = ['👥 Сотрудники', '📅 Динамика по дням', '🕒 Динамика по часам', '🌗 День и ночь'];
+test('analyseLogisticOperation: пять вкладок, единая палитра и диаграммы', () => {
+    const labels = ['📊 Продуктивность', '📦 Контекстная продуктивность', '📅 Динамика по дням', '🕒 Динамика по часам', '🌗 День и ночь'];
     labels.forEach(label => assert.ok(serviceHtml.includes(label), `нет вкладки ${label}`));
-    assert.deepStrictEqual(api.ANA_TABS.map(t => t.key), ['rating', 'daily', 'hourly', 'shifts']);
+    assert.deepStrictEqual(api.ANA_TABS.map(t => t.key), ['rating', 'productivity', 'daily', 'hourly', 'shifts']);
     ['🏆 Рейтинг', '📦 Пополнение', '🚚 ОЗК', '🏭 Складские операции', '👥 Внешний персонал', '🎯 Операции с достоверностью'].forEach(label => {
         assert.ok(!serviceHtml.includes(label), `осталась вкладка ${label}`);
     });
@@ -525,6 +526,161 @@ test('analyseLogisticOperation: сортировка топов по КПД, в�
     assert.strictEqual(api.ANA_RANK_SORT_DEFAULT, 'kpd');
     assert.deepStrictEqual([...api.ANA_SLOT_FILTER_OPTIONS], [0, 5, 10, 20, 30, 50, 100]);
     assert.strictEqual(api.ANA_SLOT_FILTER_DEFAULT, 0);
+});
+
+/* ---------- Вкладка «Продуктивность» ---------- */
+
+test('analyseLogisticOperation: часы из слотов и ставка без данных дают «—»', () => {
+    assert.strictEqual(api.anaSlotsToHours(6), 1);
+    assert.strictEqual(api.anaSlotsToHours(30), 5);
+    assert.strictEqual(api.anaRate(180, 5), 36);
+    assert.strictEqual(api.anaRate(10, 0), null);
+    assert.strictEqual(api.anaFmtRate(null), '—');
+    assert.strictEqual(api.anaFmtRate(21.0419), '21,04');
+    assert.strictEqual(api.ANA_RATE_MIN_SLOTS, 3);
+});
+
+test('analyseLogisticOperation: продуктивность по контексту pallet и sku на сотрудника', () => {
+    const sku = api.anaAggEmployees(slotRows('SKU', 'replenishment', 30, 6, { ctx: 'sku', qty: 30 }))[0];
+    assert.strictEqual(sku.skuSlots, 30);
+    assert.strictEqual(sku.skuOps, 180);
+    assert.ok(close(sku.skuQty, 900));
+    assert.ok(close(sku.skuHours, 5));
+    assert.ok(close(sku.piecesPerHour, 180), `штук/ч ${sku.piecesPerHour}`);
+    assert.ok(close(sku.skuPerHour, 36), `SKU/ч ${sku.skuPerHour}`);
+    assert.strictEqual(sku.palletsPerHour, null);
+
+    const pallet = api.anaAggEmployees(slotRows('PALLET', 'warehouse', 12, 2, { ctx: 'pallet' }))[0];
+    assert.strictEqual(pallet.palletSlots, 12);
+    assert.strictEqual(pallet.palletOps, 24);
+    assert.ok(close(pallet.palletHours, 2));
+    assert.ok(close(pallet.palletsPerHour, 12), `паллет/ч ${pallet.palletsPerHour}`);
+    assert.strictEqual(pallet.piecesPerHour, null);
+});
+
+test('analyseLogisticOperation: мало слотов контекста - «—», а не 0', () => {
+    const employee = api.anaAggEmployees(slotRows('MIN', 'replenishment', 2, 1, { ctx: 'sku', qty: 10 }))[0];
+    assert.strictEqual(employee.skuSlots, 2);
+    assert.strictEqual(employee.piecesPerHour, null);
+    assert.strictEqual(employee.skuPerHour, null);
+    assert.strictEqual(employee.palletsPerHour, null);
+    assert.strictEqual(employee.assembliesPerHour, null);
+});
+
+test('analyseLogisticOperation: сборки и сборки/час в контекстной продуктивности', () => {
+    const build = api.anaAggEmployees(slotRows('BUILD', 'orders', 30, 4, { ctx: 'sku', op: 'Сборка в заказы' }))[0];
+    assert.strictEqual(build.assemblySlots, 30);
+    assert.strictEqual(build.assemblyOps, 120);
+    assert.ok(close(build.assemblyHours, 5));
+    assert.ok(close(build.assembliesPerHour, 24), `сборок/ч ${build.assembliesPerHour}`);
+    assert.strictEqual(build.palletsPerHour, null);
+    /* Сборка в заказы идёт в контексте sku, поэтому её часы - часть SKU-часов. */
+    assert.strictEqual(build.skuSlots, 30);
+
+    /* Другие операции контекста order в сборки не попадают. */
+    const other = api.anaAggEmployees(slotRows('OTHER', 'orders', 30, 4, { ctx: 'order' }))[0];
+    assert.strictEqual(other.assemblyOps, 0);
+    assert.strictEqual(other.assembliesPerHour, null);
+
+    const few = api.anaAggEmployees(slotRows('BUILD2', 'orders', 2, 4, { ctx: 'sku', op: 'Сборка в заказы' }))[0];
+    assert.strictEqual(few.assembliesPerHour, null);
+
+    const t = api.anaTotals(validRows);
+    assert.strictEqual(t.assemblyOps, 16750);
+    assert.ok(close(t.assemblyHours, 714), `часы сборок ${t.assemblyHours}`);
+    assert.ok(close(t.assembliesPerHour, 23.4594, 0.001), `сборок/ч ${t.assembliesPerHour}`);
+    assert.ok(t.assemblyHours < t.activeHours, 'часы сборок - часть активных часов');
+});
+
+test('analyseLogisticOperation: часы контекстов пересекаются и не суммируются', () => {
+    const rows = [
+        { date: '2026-11-01', slot: 0, hour: 0, op: 'Подбор', ctx: 'pallet', ops: 1, qty: 1, ldap: 'BOTH', fio: 'Оба', pos: '', dept: 'тест', deptType: 'логистика', cat: 'warehouse', w: 1 },
+        { date: '2026-11-01', slot: 0, hour: 0, op: 'Подбор', ctx: 'sku', ops: 1, qty: 3, ldap: 'BOTH', fio: 'Оба', pos: '', dept: 'тест', deptType: 'логистика', cat: 'warehouse', w: 2 },
+        { date: '2026-11-01', slot: 10, hour: 0, op: 'Подбор', ctx: 'sku', ops: 1, qty: 4, ldap: 'BOTH', fio: 'Оба', pos: '', dept: 'тест', deptType: 'логистика', cat: 'warehouse', w: 2 },
+    ];
+    const employee = api.anaAggEmployees(rows)[0];
+    assert.strictEqual(employee.slots, 2);
+    assert.strictEqual(employee.palletSlots, 1);
+    assert.strictEqual(employee.skuSlots, 2);
+    assert.ok(close(employee.activeHours, 2 / 6));
+    assert.ok(close(employee.palletHours, 1 / 6));
+    assert.ok(close(employee.skuHours, 2 / 6));
+    assert.ok(employee.palletHours + employee.skuHours > employee.activeHours);
+});
+
+test('analyseLogisticOperation: ставки и занятость на образце', () => {
+    const t = api.anaTotals(validRows);
+    assert.strictEqual(t.palletOps, 15834);
+    assert.ok(close(t.palletHours, 752.5));
+    assert.ok(close(t.palletsPerHour, 21.0419, 0.001), `паллет/ч ${t.palletsPerHour}`);
+    assert.ok(close(t.skuQty, 1485151.243, 0.01));
+    assert.ok(close(t.skuOps, 86366));
+    assert.ok(close(t.skuHours, 3205.833, 0.01));
+    assert.ok(close(t.piecesPerHour, 463.26, 0.01), `штук/ч ${t.piecesPerHour}`);
+    assert.ok(close(t.skuPerHour, 26.94, 0.01), `SKU/ч ${t.skuPerHour}`);
+    assert.ok(close(t.activeHours, 4598.833, 0.01));
+    assert.strictEqual(t.employeeDays, 1637);
+    assert.ok(close(t.avgHoursPerDay, 2.8093, 0.001));
+    assert.ok(t.palletHours + t.skuHours < t.activeHours, 'контекстные часы не равны общим активным часам');
+});
+
+test('analyseLogisticOperation: отдельная вкладка контекстной продуктивности со своей таблицей', () => {
+    const tab = api.ANA_TABS.find(t => t.key === 'productivity');
+    assert.ok(tab, 'нет вкладки «Контекстная продуктивность»');
+    assert.strictEqual(tab.kind, 'productivity');
+    assert.strictEqual(tab.label, '📦 Контекстная продуктивность');
+    assert.strictEqual(api.ANA_TABS.find(t => t.key === 'rating').label, '📊 Продуктивность');
+    const keys = api.anaTableColumns('productivity').map(c => c.key);
+    assert.deepStrictEqual(keys, [
+        'fio', 'dept', 'palletOps', 'palletHours', 'palletsPerHour',
+        'skuQty', 'skuHours', 'piecesPerHour', 'skuPerHour',
+        'assemblyOps', 'assembliesPerHour', 'activeHours', 'avgHoursPerDay',
+    ]);
+    const cols = api.anaTableColumns('productivity');
+    assert.strictEqual(cols.find(c => c.key === 'palletOps').emptyOn, 'palletSlots');
+    assert.strictEqual(cols.find(c => c.key === 'skuQty').emptyOn, 'skuSlots');
+    assert.strictEqual(cols.find(c => c.key === 'assemblyOps').emptyOn, 'assemblySlots');
+    assert.ok(cols.filter(c => c.rate).length === 4, 'должны быть четыре ставки');
+    assert.ok(serviceHtml.includes('Таблица по паллетам и штукам SKU'), 'нет собственной таблицы вкладки');
+    assert.ok(serviceHtml.includes('Паллет/час = Паллеты / Активные часы паллетных строк'), 'нет формулы паллет/час');
+    assert.ok(serviceHtml.includes('Штук SKU/час = Штуки SKU / Активные часы SKU-строк'), 'нет формулы штук SKU/час');
+    assert.ok(serviceHtml.includes('Сборки/час = Сборки / Активные часы строк «Сборка в заказы»'), 'нет формулы сборок/час');
+});
+
+test('analyseLogisticOperation: топ-10 и сортировки на вкладке контекстной продуктивности', () => {
+    assert.deepStrictEqual(api.ANA_PROD_SORT_OPTIONS.map(o => o[0]), [
+        'palletsPerHour', 'skuPerHour', 'piecesPerHour', 'palletOps', 'skuQty', 'assemblyOps', 'assembliesPerHour',
+    ]);
+    assert.strictEqual(api.anaProdSortLabel('palletsPerHour'), 'паллетам/ч');
+    assert.strictEqual(api.anaProdSortLabel('piecesPerHour', true), 'Шт. SKU/ч');
+    assert.strictEqual(api.anaProdSortLabel('assembliesPerHour'), 'сборкам/ч');
+    const list = [
+        { fio: 'A', palletsPerHour: 10, piecesPerHour: 100, skuPerHour: 5, palletOps: 100, skuQty: 1000, assemblyOps: 50, assembliesPerHour: 12, activeHours: 10 },
+        { fio: 'B', palletsPerHour: null, piecesPerHour: null, skuPerHour: null, palletOps: 0, skuQty: 0, assemblyOps: 0, assembliesPerHour: null, activeHours: 0 },
+        { fio: 'C', palletsPerHour: 20, piecesPerHour: 50, skuPerHour: 8, palletOps: 50, skuQty: 2000, assemblyOps: 80, assembliesPerHour: 6, activeHours: 5 },
+    ];
+    const sorted = mode => list.slice().sort(api.anaProdComparator(mode)).map(e => e.fio);
+    assert.deepStrictEqual(sorted('palletsPerHour'), ['C', 'A', 'B']);
+    assert.deepStrictEqual(sorted('skuPerHour'), ['C', 'A', 'B']);
+    assert.deepStrictEqual(sorted('piecesPerHour'), ['A', 'C', 'B']);
+    assert.deepStrictEqual(sorted('palletOps'), ['A', 'C', 'B']);
+    assert.deepStrictEqual(sorted('skuQty'), ['C', 'A', 'B']);
+    assert.deepStrictEqual(sorted('assemblyOps'), ['C', 'A', 'B']);
+    assert.deepStrictEqual(sorted('assembliesPerHour'), ['A', 'C', 'B']);
+    assert.ok(serviceHtml.includes('anaRenderProdTopCards'), 'нет топ-10 на вкладке');
+    assert.ok(serviceHtml.includes('data-prod-sort'), 'нет кнопок сортировки топ-10');
+    /* Порог слотов из топ-10 вкладки «Продуктивность» доступен и здесь. */
+    assert.ok(/const slotFilterBlock = \(isEmployee \|\| isProductivity\)/.test(serviceHtml), 'нет порога слотов в топ-10 контекстной продуктивности');
+    assert.ok(/tab\.key === 'productivity'[\s\S]{0,200}anaRenderProdTopCards/.test(serviceHtml), 'порог слотов не перерисовывает топ-10');
+    /* Фильтры топ-10 - тот же набор, что над топ-10 вкладки «Продуктивность». */
+    assert.ok(serviceHtml.includes('function anaTopFiltersHtml'), 'нет панели фильтров в топ-10');
+    assert.ok(serviceHtml.includes('tp-${tab.key}-${f}'), 'у фильтров топ-10 нет своего префикса');
+    assert.ok(serviceHtml.includes('function anaSetTopFilter'), 'фильтры топ-10 не подключены');
+    assert.ok(serviceHtml.includes('function anaResetTopFilters'), 'нет сброса фильтров топ-10');
+    assert.ok(serviceHtml.includes("['tf', 'tp']"), 'фильтры топ-10 и таблицы не синхронизированы');
+    assert.ok(/\$\{anaTopFiltersHtml\(tab\)\}/.test(serviceHtml), 'панель фильтров не выведена в блоке топ-10');
+    assert.ok(serviceHtml.includes('Динамика по дням по категориям операций'), 'нет гистограммы категорий в карточке');
+    assert.ok(/stack:\s*'ops'/.test(serviceHtml), 'динамика по дням не разбита по категориям');
 });
 
 test('analyseLogisticOperation: медианы удалены из сервиса и справки', () => {
