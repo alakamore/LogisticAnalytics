@@ -7,7 +7,7 @@
    ===================================================== */
 
 self.PORTAL_CONFIG = Object.freeze({
-    version: '1.0.6',
+    version: '1.0.7',
     releaseDate: '27.11.2026',
     services: Object.freeze([
         Object.freeze({
@@ -101,7 +101,7 @@ self.PORTAL_CONFIG = Object.freeze({
         Object.freeze({
             id: 'analyse_logistic_operation',
             title: 'Аналитика логистических операций',
-            version: '1.0.5',
+            version: '1.0.6',
             icon: '📈',
             url: 'Services/analyseLogisticOperation/index.html',
             desc: 'Динамика операций по дням и часам, продуктивность по паллетам и штукам SKU, КПД, топ-10, доли по категориям и контекстам.',

@@ -1,6 +1,6 @@
 {
   "name": "logistics-analytics-portal",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "private": true,
   "type": "module",
   "description": "Портал отчётов складской логистики: клиентская аналитика в браузере без сервера и сборки",

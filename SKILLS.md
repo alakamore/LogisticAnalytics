@@ -79,26 +79,30 @@
 - Вкладка «Контекстная продуктивность» (`kind === 'productivity'`, ключ `productivity`) - карточки, топ-10 и собственная
   таблица, без блока графиков (`sec-charts` скрыт). Топ-10 живёт в отдельной секции `sec-top` и сортируется
   через `ANA_PROD_SORT_OPTIONS` (`palletsPerHour`, `skuPerHour`, `piecesPerHour`, `palletOps`, `skuQty`,
-  `assemblyOps`, `assembliesPerHour`) функцией `anaProdComparator`; ставки `null` всегда в конце.
-  `anaRenderProdTopCards` вызывается из `anaRenderTable`, поэтому топ учитывает фильтры таблицы; первая метрика
-  карточки - выбранная сортировка. Над топ-10 стоит панель `anaTopFiltersHtml(tab)` со своим префиксом `tp-#{key}-*`
-  (контекст, тип, подразделение, должность, категория, операция, сброс) - тот же набор, что над топ-10 вкладки
-  «Продуктивность». `anaSetTopFilter` пишет в общие `anaTableFilters`, `anaResetTopFilters` вызывает
-  `anaResetFilters(key, 'table')`, а `anaRefreshFilterOptions` заполняет селекторы обоих префиксов (`['tf', 'tp']`),
-  поэтому панели топ-10 и таблицы всегда синхронны. В шапке топ-10 есть тот же `anaSlotFilter`, что и на вкладке
-  «Продуктивность»: `anaRenderProdTopCards` применяет `anaFilterBySlots`, а `anaSetSlotFilter` перерисовывает
-  топ активной вкладки и синхронизирует оба селектора.
+  `assemblyOps`, `assembliesPerHour`, `orderOps`, `ordersPerHour`) функцией `anaProdComparator`; ставки `null` всегда в конце.
+  `anaRenderProdTopCards` вызывается из `anaRenderProdTopFromFilters` (а не из таблицы), поэтому топ-10 считается
+  только по своим фильтрам; первая метрика карточки - выбранная сортировка. Над топ-10 стоит панель
+  `anaTopFiltersHtml(tab)` со своим префиксом `tp-${key}-*` (контекст, тип, подразделение, должность, категория,
+  операция, сброс) - тот же набор, что над топ-10 вкладки «Продуктивность», но с отдельным состоянием
+  `anaTopFilters`. `anaSetTopFilter` пишет в `anaTopFilters`, `anaResetTopFilters` сбрасывает только их,
+  `anaRefreshFilterOptions` поддерживает `kind === 'top'` (префикс `tp`). Фильтры таблицы (`anaTableFilters`)
+  и топ-10 независимы: изменения в одной панели не трогают другую. В шапке топ-10 есть тот же `anaSlotFilter`,
+  что и на вкладке «Продуктивность»: `anaRenderProdTopCards` применяет `anaFilterBySlots`, а `anaSetSlotFilter`
+  перерисовывает топ активной вкладки и синхронизирует оба селектора.
   `anaAggEmployees` и `anaTotals` дополнительно считают `palletOps`, `palletSlotSet`/`palletSlots`,
   `palletHours`, `palletsPerHour`, `skuOps`, `skuQty`, `skuSlotSet`/`skuSlots`, `skuHours`, `piecesPerHour`,
   `skuPerHour`, `assemblyOps`, `assemblySlotSet`/`assemblySlots`, `assemblyHours`, `assembliesPerHour`,
-  `activeHours`, `avgHoursPerDay`. «Сборки» - только операция `ANA_ASSEMBLY_OP = 'Сборка в заказы'`, а не весь
-  контекст `order`; её строки идут с контекстом `sku`, поэтому часы сборок входят в SKU-часы.
+  `orderOps`, `orderSlotSet`/`orderSlots`, `orderHours`, `ordersPerHour`, `activeHours`, `avgHoursPerDay`.
+  «Сборки» - только операция `ANA_ASSEMBLY_OP = 'Сборка в заказы'`, а не весь
+  контекст `order`; её строки идут с контекстом `sku`, поэтому часы сборок входят в SKU-часы. «Заказы» -
+  отдельно строки контекста `order`.
   Слоты контекста - уникальные пары «сотрудник + дата + слот»;
   `anaSlotsToHours` переводит их в часы, `anaRate` возвращает `null` при нулевом знаменателе,
   `anaFmtRate` печатает `—`. `ANA_RATE_MIN_SLOTS = 3`: меньше трёх слотов контекста - ставка `null`, а не 0.
-  Часы pallet, sku и сборок пересекаются и не суммируются; общий знаменатель - только `activeHours`.
-  `anaTableColumns('productivity')` задаёт 13 колонок от паллет до ч/день, включая «Сборки» и «Сборки/ч»;
-  ставки помечены `rate: true`, поля контекста - `emptyOn: 'palletSlots'` / `'skuSlots'` / `'assemblySlots'`
+  Часы pallet, sku, order и сборок пересекаются и не суммируются; общий знаменатель - только `activeHours`.
+  `anaTableColumns('productivity')` задаёт 12 колонок от паллет до активных часов, включая «Сборки»,
+  «Сборки/ч», «Заказы» и «Заказы/ч»; часы pallet/SKU и «Ч/день» в таблицу не выводятся. Ставки помечены
+  `rate: true`, поля контекста - `emptyOn: 'palletSlots'` / `'skuSlots'` / `'assemblySlots'` / `'orderSlots'`
   (нет контекста - `—`, а не 0), `anaTableCell` печатает ставки через `anaFmtRate`, а `anaRenderTable` ставит
   `null` в конец при любой сортировке.
   Фильтры таблицы свои, экспорт - `anaExportTab`. В карточке сотрудника `profileDayChart` - стек

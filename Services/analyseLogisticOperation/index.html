@@ -2170,16 +2170,18 @@
 
                 <div class="info-section">
                     <h4>📦 Контекстная продуктивность</h4>
-                    <p>Вкладка «Контекстная продуктивность» показывает, сколько паллет, штук SKU и сборок заказов сотрудник обрабатывает за час активной работы в своём контексте.</p>
+                    <p>Вкладка «Контекстная продуктивность» показывает, сколько паллет, штук SKU, сборок и заказов сотрудник обрабатывает за час активной работы в своём контексте.</p>
                     <ul>
                         <li><b>Паллеты</b> - Σ «Кол-во операций» по строкам с контекстом <b>pallet</b>: одна операция = один паллет.</li>
                         <li><b>Штуки SKU</b> - Σ «Кол-во штук» только по строкам с контекстом <b>sku</b>.</li>
                         <li><b>Сборки</b> - Σ «Кол-во операций» только по операции <b>«Сборка в заказы»</b>.</li>
+                        <li><b>Заказы</b> - Σ «Кол-во операций» по строкам с контекстом <b>order</b>.</li>
                         <li><b>Активные часы</b> - уникальные слоты (ЛДАП, дата, 10-минутный интервал) × 10 / 60. Перерывы и простои не входят.</li>
-                        <li><b>Паллет/ч</b> - паллеты / активные часы паллетных строк; <b>Штук SKU/ч</b> - штуки SKU / активные часы SKU-строк; <b>SKU/ч</b> - SKU-операции / активные часы SKU-строк; <b>Сборки/ч</b> - сборки / активные часы строк операции «Сборка в заказы».</li>
-                        <li>Часы контекстов пересекаются: один слот может содержать pallet, sku и сборки, поэтому их нельзя суммировать как общий знаменатель.</li>
+                        <li><b>Паллет/ч</b> - паллеты / активные часы паллетных строк; <b>Штук SKU/ч</b> - штуки SKU / активные часы SKU-строк; <b>SKU/ч</b> - SKU-операции / активные часы SKU-строк; <b>Сборки/ч</b> - сборки / активные часы строк операции «Сборка в заказы»; <b>Заказы/ч</b> - заказы / активные часы строк контекста order.</li>
+                        <li>Часы контекстов пересекаются: один слот может содержать pallet, sku, order и сборки, поэтому их нельзя суммировать как общий знаменатель.</li>
                         <li>Ставка показывается от <b>3 активных слотов</b> контекста, иначе «—», а не 0.</li>
-                        <li><b>Топ-10</b> сортируется по паллетам/ч, SKU/ч, штукам SKU/ч, паллетам, штукам, сборкам и сборкам/ч; на него влияют фильтры над топ-10 (они же фильтры таблицы) и порог активных слотов.</li>
+                        <li><b>Топ-10</b> сортируется по паллетам/ч, SKU/ч, штукам SKU/ч, паллетам, штукам, сборкам, сборкам/ч, заказам и заказам/ч; на него влияют только фильтры над топ-10 и порог активных слотов.</li>
+                        <li>Таблица фильтруется независимо от топ-10: фильтры над топ-10 не меняют таблицу, и наоборот.</li>
                         <li>В карточке сотрудника динамика по дням разбита по категориям операций: каждый столбец - стек категорий.</li>
                         <li>Это интенсивность в активное время, а не продуктивность по табелю.</li>
                     </ul>
@@ -2192,10 +2194,12 @@
                     <div class="formula">Паллеты = Σ Кол-во операций, контекст = pallet</div>
                     <div class="formula">Штуки SKU = Σ Кол-во штук, контекст = sku</div>
                     <div class="formula">Сборки = Σ Кол-во операций, операция = «Сборка в заказы»</div>
+                    <div class="formula">Заказы = Σ Кол-во операций, контекст = order</div>
                     <div class="formula">Активные часы = Уникальные (ЛДАП, дата, слот) × 10 / 60</div>
                     <div class="formula">Паллет/час = Паллеты / Активные часы паллетных строк</div>
                     <div class="formula">Штук SKU/час = Штуки SKU / Активные часы SKU-строк</div>
                     <div class="formula">Сборки/час = Сборки / Активные часы строк «Сборка в заказы»</div>
+                    <div class="formula">Заказы/час = Заказы / Активные часы строк контекста order</div>
                     <div class="formula">Доля, % = Показатель / Итог по текущим фильтрам × 100</div>
                     <p>Вес зависит только от контекста операции. Несколько строк в одном 10-минутном интервале дают один активный слот.</p>
                     <div class="weights-wrap">
@@ -2359,7 +2363,7 @@
 
         const ANA_TABS = Object.freeze([
             { key: 'rating', label: '📊 Продуктивность', kind: 'employees', catFilter: true, icon: '📊', desc: 'Продуктивность сотрудников всех подразделений: КПД, топ-10, доли операций по категориям и контекстам, достоверность.' },
-            { key: 'productivity', label: '📦 Контекстная продуктивность', kind: 'productivity', icon: '📦', desc: 'Контекстная продуктивность по паллетам, штукам SKU и сборкам заказов: ставки в час на активных часах своего контекста.' },
+            { key: 'productivity', label: '📦 Контекстная продуктивность', kind: 'productivity', icon: '📦', desc: 'Контекстная продуктивность по паллетам, штукам SKU, сборкам и заказам: ставки в час на активных часах своего контекста.' },
             { key: 'daily', label: '📅 Динамика по дням', kind: 'days', icon: '📅', desc: 'Операции и трудоёмкость по календарным дням.' },
             { key: 'hourly', label: '🕒 Динамика по часам', kind: 'hours', icon: '🕒', desc: 'Активность по часам и 10-минутным слотам, тепловые карты операций и категорий по часам.' },
             { key: 'shifts', label: '🌗 День и ночь', kind: 'shifts', icon: '🌗', desc: 'Соотношение показателей дневной (07:30-19:30) и ночной (19:30-07:30) смен.' },
@@ -2371,7 +2375,7 @@
            активных слотов: иначе это случайная оценка, а не продуктивность. */
         const ANA_RATE_MIN_SLOTS = 3;
         /* Топ-10 на вкладке «Контекстная продуктивность» можно сортировать по
-           ставкам и по абсолютным объёмам, включая сборки. */
+           ставкам и по абсолютным объёмам, включая сборки и заказы. */
         const ANA_PROD_SORT_OPTIONS = Object.freeze([
             ['palletsPerHour', 'Пал/ч', 'паллетам/ч'],
             ['skuPerHour', 'SKU/ч', 'SKU/ч'],
@@ -2380,6 +2384,8 @@
             ['skuQty', 'Штуки', 'штукам SKU'],
             ['assemblyOps', 'Сборки', 'сборкам'],
             ['assembliesPerHour', 'Сборки/ч', 'сборкам/ч'],
+            ['orderOps', 'Заказы', 'заказам'],
+            ['ordersPerHour', 'Заказы/ч', 'заказам/ч'],
         ]);
 
         /* ---------- Состояние ---------- */
@@ -2395,6 +2401,9 @@
         let anaTableCache = {};
         let anaChartFilters = {};
         let anaTableFilters = {};
+        /* Фильтры топ-10 контекстной продуктивности независимы от фильтров
+           таблицы: каждая панель фильтрует только свой блок. */
+        let anaTopFilters = {};
         /* Фильтр карты универсальности: 0 - все сотрудники, 1-5 - ровно
            столько категорий закрывает сотрудник. */
         let anaUniLevel = 0;
@@ -2595,6 +2604,7 @@
             });
             anaChartFilters[key] = { pos: '', ctx: '', type: '', dept: '', cat: '', op: '' };
             anaTableFilters[key] = { search: '', pos: '', ctx: '', type: '', dept: '', cat: '', op: '' };
+            anaTopFilters[key] = { pos: '', ctx: '', type: '', dept: '', cat: '', op: '' };
             anaTableState[key] = {
                 sortCol: tab && tab.kind === 'days' ? 'date'
                     : (tab && tab.kind === 'hours' ? 'hour'
@@ -2722,15 +2732,15 @@
             const isHours = tab.kind === 'hours';
             const isShifts = tab.kind === 'shifts';
             const secTitle = isHours ? 'Динамика по часам' : isShifts ? 'День и ночь' : isProductivity ? 'Контекстная продуктивность' : 'Графики и рейтинги';
-            const secBadge = isHours ? '24 часа' : isShifts ? '2 смены' : isProductivity ? 'Паллеты · SKU · Сборки' : 'Период';
+            const secBadge = isHours ? '24 часа' : isShifts ? '2 смены' : isProductivity ? 'Паллеты · SKU · Сборки · Заказы' : 'Период';
             const tableBlock = noTable ? '' : `
                 <div class="section-block sec-table">
-                    <div class="section-header"><div class="sec-icon">📋</div><h3>${isProductivity ? 'Таблица по паллетам и штукам SKU' : 'Таблица'}</h3><div class="sec-line"></div>
+                    <div class="section-header"><div class="sec-icon">📋</div><h3>${isProductivity ? 'Таблица по контекстам' : 'Таблица'}</h3><div class="sec-line"></div>
                         <span class="section-badge" id="count-${k}">0</span>
                         <button class="btn" onclick="anaExportTab('${k}')">📥 Экспорт</button>
                     </div>
                     ${anaFiltersHtml(tab, 'tf', true)}
-                    ${tab.kind === 'productivity' ? '<div class="table-note"><span>Паллет/ч и Штук SKU/ч считаются на активных часах своего контекста. Сборки - только операция «Сборка в заказы», её часы входят в SKU-часы. Меньше 3 активных слотов контекста - ставка «—».</span></div>' : ''}
+                    ${tab.kind === 'productivity' ? '<div class="table-note"><span>Паллет/ч, Штук SKU/ч и Заказы/ч считаются на активных часах своего контекста. Сборки - только операция «Сборка в заказы», её часы входят в SKU-часы. Меньше 3 активных слотов контекста - ставка «—».</span></div>' : ''}
                     <div class="table-note" id="tnote-${k}"></div>
                     <div class="table-wrap"><table class="ana-table"><thead id="thead-${k}"></thead><tbody id="tbody-${k}"></tbody></table></div>
                     <div class="pagination" id="pag-${k}"></div>
@@ -3081,9 +3091,9 @@
                     e = {
                         ldap: r.ldap, fio: r.fio, pos: r.pos, dept: r.dept, deptType: r.deptType,
                         ops: 0, qty: 0, w: 0, accOps: 0, accQty: 0, accW: 0,
-                        palletOps: 0, skuOps: 0, skuQty: 0, assemblyOps: 0,
+                        palletOps: 0, skuOps: 0, skuQty: 0, assemblyOps: 0, orderOps: 0,
                         slotSet: new Set(), daySet: new Set(),
-                        palletSlotSet: new Set(), skuSlotSet: new Set(), assemblySlotSet: new Set(),
+                        palletSlotSet: new Set(), skuSlotSet: new Set(), assemblySlotSet: new Set(), orderSlotSet: new Set(),
                         catW: {}, catOps: {}, opW: {},
                         catAgg: {},
                     };
@@ -3105,6 +3115,9 @@
                     e.skuOps += r.ops;
                     e.skuQty += r.qty;
                     e.skuSlotSet.add(`${r.date}|${r.slot}`);
+                } else if (r.ctx === 'order') {
+                    e.orderOps += r.ops;
+                    e.orderSlotSet.add(`${r.date}|${r.slot}`);
                 }
                 if (r.op === ANA_ASSEMBLY_OP) {
                     e.assemblyOps += r.ops;
@@ -3136,6 +3149,9 @@
                 e.assemblySlots = e.assemblySlotSet.size;
                 e.assemblyHours = anaSlotsToHours(e.assemblySlots);
                 e.assembliesPerHour = e.assemblySlots >= ANA_RATE_MIN_SLOTS ? anaRate(e.assemblyOps, e.assemblyHours) : null;
+                e.orderSlots = e.orderSlotSet.size;
+                e.orderHours = anaSlotsToHours(e.orderSlots);
+                e.ordersPerHour = e.orderSlots >= ANA_RATE_MIN_SLOTS ? anaRate(e.orderOps, e.orderHours) : null;
                 e.kpd = e.slots ? e.w / e.slots : 0;
                 e.accShare = e.w ? (e.accW / e.w) * 100 : 0;
                 let topCat = '';
@@ -3205,16 +3221,21 @@
             };
         }
 
+        /* Верхний блок считается только по своим фильтрам - таблица на него
+           не влияет, и наоборот. */
+        function anaRenderProdTopFromFilters(key) {
+            const tab = anaGetTab(key);
+            if (!tab) return;
+            anaRenderProdTopCards(tab, anaFilterRows(anaTabBase(key), anaTopFilters[key] || {}));
+        }
+
         function anaSetProdSort(value) {
             if (!ANA_PROD_SORT_OPTIONS.some(o => o[0] === value)) return;
             anaProdSort = value;
             document.querySelectorAll('.rank-sort-btn[data-prod-sort]').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.prodSort === value);
             });
-            const tab = anaGetTab('productivity');
-            if (!tab) return;
-            const rows = anaFilterRows(anaTabBase('productivity'), anaTableFilters['productivity'] || {});
-            anaRenderProdTopCards(tab, rows);
+            anaRenderProdTopFromFilters('productivity');
         }
 
         function anaRenderProdTopCards(tab, rows) {
@@ -3240,9 +3261,11 @@
                     skuQty: { value: e.skuSlots ? anaFmt(e.skuQty) : '—', label: 'штук SKU' },
                     assemblyOps: { value: e.assemblySlots ? anaFmtInt(e.assemblyOps) : '—', label: 'сборок' },
                     assembliesPerHour: { value: anaFmtRate(e.assembliesPerHour), label: 'сб/ч' },
+                    orderOps: { value: e.orderSlots ? anaFmtInt(e.orderOps) : '—', label: 'заказов' },
+                    ordersPerHour: { value: anaFmtRate(e.ordersPerHour), label: 'зак/ч' },
                 };
                 /* Метрика сортировки - первой, чтобы топ читался сразу. */
-                const order = [anaProdSort, ...['palletsPerHour', 'piecesPerHour', 'palletOps', 'skuQty', 'assembliesPerHour', 'assemblyOps'].filter(k => k !== anaProdSort)];
+                const order = [anaProdSort, ...['palletsPerHour', 'piecesPerHour', 'palletOps', 'skuQty', 'assembliesPerHour', 'assemblyOps', 'ordersPerHour', 'orderOps'].filter(k => k !== anaProdSort)];
                 return anaTopCardHtml({
                     rank: i + 1,
                     title: e.fio,
@@ -3254,7 +3277,8 @@
                     foot: [
                         anaProdSort === 'skuPerHour' ? `Штуки: ${anaFmt(e.skuQty)}`
                             : anaProdSort === 'assemblyOps' ? `Сборки/ч: ${anaFmtRate(e.assembliesPerHour)}`
-                                : `SKU/ч: ${anaFmtRate(e.skuPerHour)}`,
+                                : anaProdSort === 'orderOps' ? `Заказы/ч: ${anaFmtRate(e.ordersPerHour)}`
+                                    : `SKU/ч: ${anaFmtRate(e.skuPerHour)}`,
                         `${anaFmt(e.activeHours)} ч`,
                     ],
                 });
@@ -3269,8 +3293,8 @@
             const tab = anaGetTab(anaActiveTab);
             if (!tab) return;
             if (tab.key === 'productivity') {
-                /* Сначала фильтры таблицы, затем порог слотов - так же, как на рейтинге. */
-                anaRenderProdTopCards(tab, anaFilterRows(anaTabBase(tab.key), anaTableFilters[tab.key]));
+                /* Топ-10 живет на собственных фильтрах; порог слотов применяется поверх. */
+                anaRenderProdTopFromFilters(tab.key);
             } else if (tab.kind === 'employees') {
                 anaRenderTopCards(tab, anaFilterRows(anaTabBase(tab.key), anaChartFilters[tab.key]));
             }
@@ -3360,7 +3384,7 @@
 
         function anaTotals(rows) {
             let ops = 0, qty = 0, w = 0;
-            let palletOps = 0, skuOps = 0, skuQty = 0, assemblyOps = 0;
+            let palletOps = 0, skuOps = 0, skuQty = 0, assemblyOps = 0, orderOps = 0;
             const slotSet = new Set();
             const daySet = new Set();
             const empSet = new Set();
@@ -3368,6 +3392,7 @@
             const palletSlotSet = new Set();
             const skuSlotSet = new Set();
             const assemblySlotSet = new Set();
+            const orderSlotSet = new Set();
             rows.forEach(r => {
                 ops += r.ops;
                 qty += r.qty;
@@ -3382,6 +3407,9 @@
                     skuOps += r.ops;
                     skuQty += r.qty;
                     skuSlotSet.add(slotKey);
+                } else if (r.ctx === 'order') {
+                    orderOps += r.ops;
+                    orderSlotSet.add(slotKey);
                 }
                 if (r.op === ANA_ASSEMBLY_OP) {
                     assemblyOps += r.ops;
@@ -3395,6 +3423,7 @@
             const palletHours = anaSlotsToHours(palletSlotSet.size);
             const skuHours = anaSlotsToHours(skuSlotSet.size);
             const assemblyHours = anaSlotsToHours(assemblySlotSet.size);
+            const orderHours = anaSlotsToHours(orderSlotSet.size);
             const activeHours = anaSlotsToHours(slotSet.size);
             return {
                 ops, qty, w,
@@ -3418,6 +3447,10 @@
                 assemblySlots: assemblySlotSet.size,
                 assemblyHours,
                 assembliesPerHour: assemblySlotSet.size >= ANA_RATE_MIN_SLOTS ? anaRate(assemblyOps, assemblyHours) : null,
+                orderOps,
+                orderSlots: orderSlotSet.size,
+                orderHours,
+                ordersPerHour: orderSlotSet.size >= ANA_RATE_MIN_SLOTS ? anaRate(orderOps, orderHours) : null,
                 kpd: slotSet.size ? w / slotSet.size : 0,
             };
         }
@@ -3460,11 +3493,12 @@
             const tab = anaGetTab(key);
             if (!tab) return;
             const isChart = kind === 'chart';
-            const f = isChart ? anaChartFilters[key] : anaTableFilters[key];
+            const isTop = kind === 'top';
+            const f = isChart ? anaChartFilters[key] : (isTop ? anaTopFilters[key] : anaTableFilters[key]);
             if (!f) return;
-            /* У таблицы и топ-10 одна панель фильтров в двух местах - заполняем
-               селекторы обоих префиксов из общего состояния. */
-            const prefixes = isChart ? ['cf'] : ['tf', 'tp'];
+            /* У каждой панели свой префикс и свое состояние: фильтры топ-10
+               не пересекаются с фильтрами таблицы. */
+            const prefix = isChart ? 'cf' : (isTop ? 'tp' : 'tf');
             const base = anaTabBase(key);
 
             /* Подразделение задаёт тип; чужое подразделение при смене типа
@@ -3495,18 +3529,16 @@
             const ops = anaFilterOptionValues(base, f, 'op');
             if (f.op && !ops.includes(f.op)) f.op = '';
 
-            prefixes.forEach(prefix => {
-                f.ctx = anaFillSelect(`${prefix}-${key}-ctx`, ctxs.map(ctx => ({ value: ctx, label: ANA_CTX_LABELS[ctx] })), f.ctx, 'Все контексты');
-                f.type = anaFillSelect(`${prefix}-${key}-type`, types.map(t => ({ value: t, label: t })), f.type, 'Все типы');
-                f.dept = anaFillSelect(`${prefix}-${key}-dept`, depts.map(d => ({ value: d, label: d })), f.dept, 'Все подразделения');
-                f.pos = anaFillSelect(`${prefix}-${key}-pos`, positions.map(p => ({ value: p, label: p })), f.pos, 'Все должности');
-                if (document.getElementById(`${prefix}-${key}-cat`)) {
-                    f.cat = anaFillSelect(`${prefix}-${key}-cat`, cats.map(c => ({ value: c, label: anaCatLabel(c) })), f.cat, 'Все категории');
-                }
-                f.op = anaFillSelect(`${prefix}-${key}-op`, ops.map(o => ({ value: o, label: o })), f.op, 'Все операции');
-            });
+            f.ctx = anaFillSelect(`${prefix}-${key}-ctx`, ctxs.map(ctx => ({ value: ctx, label: ANA_CTX_LABELS[ctx] })), f.ctx, 'Все контексты');
+            f.type = anaFillSelect(`${prefix}-${key}-type`, types.map(t => ({ value: t, label: t })), f.type, 'Все типы');
+            f.dept = anaFillSelect(`${prefix}-${key}-dept`, depts.map(d => ({ value: d, label: d })), f.dept, 'Все подразделения');
+            f.pos = anaFillSelect(`${prefix}-${key}-pos`, positions.map(p => ({ value: p, label: p })), f.pos, 'Все должности');
+            if (document.getElementById(`${prefix}-${key}-cat`)) {
+                f.cat = anaFillSelect(`${prefix}-${key}-cat`, cats.map(c => ({ value: c, label: anaCatLabel(c) })), f.cat, 'Все категории');
+            }
+            f.op = anaFillSelect(`${prefix}-${key}-op`, ops.map(o => ({ value: o, label: o })), f.op, 'Все операции');
 
-            if (!isChart) {
+            if (!isChart && !isTop) {
                 const search = document.getElementById(`tf-${key}-search`);
                 if (search && search.value !== f.search) search.value = f.search;
             }
@@ -3549,15 +3581,32 @@
             anaRenderTable(key);
         }
 
-        /* Фильтры над топ-10 контекстной продуктивности пишут в те же
-           anaTableFilters, что и фильтры таблицы: обе панели показывают одно
-           состояние, и топ-10 с таблицей всегда согласованы. */
+        /* Фильтры над топ-10 контекстной продуктивности живут отдельно от
+           фильтров таблицы: топ-10 и таблица фильтруются независимо. */
         function anaSetTopFilter(key, field, value) {
-            anaSetTableFilter(key, field, value);
+            if (!anaTopFilters[key]) return;
+            anaTopFilters[key][field] = value;
+            if (field === 'type' && !value) anaTopFilters[key].dept = '';
+            if (field === 'dept' && value) {
+                const row = anaTabBase(key).find(r => r.dept === value);
+                if (row) anaTopFilters[key].type = row.deptType;
+            }
+            /* Явный выбор категории важнее операции: если выбранной операции
+               в этой категории нет, сбрасываем операцию, а не категорию. */
+            if (field === 'cat' && value && anaTopFilters[key].op) {
+                const base = anaTabBase(key);
+                if (!base.some(r => r.cat === value && r.op === anaTopFilters[key].op)) anaTopFilters[key].op = '';
+            }
+            anaRefreshFilterOptions(key, 'top');
+            anaRenderProdTopFromFilters(key);
         }
 
         function anaResetTopFilters(key) {
-            anaResetFilters(key, 'table');
+            const f = anaTopFilters[key];
+            if (!f) return;
+            ANA_FILTER_FIELDS.forEach(field => { f[field] = ''; });
+            anaRefreshFilterOptions(key, 'top');
+            anaRenderProdTopFromFilters(key);
         }
 
         /* Фильтр карты универсальности: 0 - все, 1-5 - ровно столько
@@ -4306,9 +4355,11 @@
             if (!tab) return;
             anaRefreshFilterOptions(key, 'chart');
             anaRefreshFilterOptions(key, 'table');
+            anaRefreshFilterOptions(key, 'top');
             anaRenderStats(key);
             anaRenderCharts(key);
             anaRenderTable(key);
+            if (tab.kind === 'productivity') anaRenderProdTopFromFilters(key);
             anaRenderUniversality(key);
             anaRendered.add(key);
         }
@@ -4338,16 +4389,15 @@
                     { key: 'fio', label: 'Сотрудник' },
                     { key: 'dept', label: 'Подразделение' },
                     { key: 'palletOps', label: 'Паллеты', num: true, emptyOn: 'palletSlots', hint: 'Σ Кол-во операций по строкам с контекстом pallet' },
-                    { key: 'palletHours', label: 'Часы pallet', num: true, dec: 1, emptyOn: 'palletSlots', hint: 'Активные часы паллетных строк: уникальные слоты × 10 / 60' },
                     { key: 'palletsPerHour', label: 'Паллет/ч', num: true, rate: true, hint: 'Паллеты / активные часы паллетных строк; от 3 слотов' },
                     { key: 'skuQty', label: 'Штуки SKU', num: true, dec: 1, emptyOn: 'skuSlots', hint: 'Σ Кол-во штук по строкам с контекстом sku' },
-                    { key: 'skuHours', label: 'Часы SKU', num: true, dec: 1, emptyOn: 'skuSlots', hint: 'Активные часы SKU-строк: уникальные слоты × 10 / 60' },
                     { key: 'piecesPerHour', label: 'Штук SKU/ч', num: true, rate: true, hint: 'Штуки SKU / активные часы SKU-строк; от 3 слотов' },
                     { key: 'skuPerHour', label: 'SKU/ч', num: true, rate: true, hint: 'SKU-операции / активные часы SKU-строк' },
                     { key: 'assemblyOps', label: 'Сборки', num: true, emptyOn: 'assemblySlots', hint: 'Σ Кол-во операций по операции «Сборка в заказы»' },
                     { key: 'assembliesPerHour', label: 'Сборки/ч', num: true, rate: true, hint: 'Сборки / активные часы строк операции «Сборка в заказы»; от 3 слотов' },
+                    { key: 'orderOps', label: 'Заказы', num: true, emptyOn: 'orderSlots', hint: 'Σ Кол-во операций по строкам с контекстом order' },
+                    { key: 'ordersPerHour', label: 'Заказы/ч', num: true, rate: true, hint: 'Заказы / активные часы строк контекста order; от 3 слотов' },
                     { key: 'activeHours', label: 'Активных часов', num: true, dec: 1, hint: 'Все уникальные активные слоты сотрудника' },
-                    { key: 'avgHoursPerDay', label: 'Ч/день', num: true, dec: 2, hint: 'Активные часы / активные дни' },
                 ];
             }
             if (tab.kind === 'days') {
@@ -4540,7 +4590,6 @@
             if (!tab) return;
             if (tab.kind === 'days' || tab.kind === 'hours' || tab.kind === 'shifts') return;
             const filtered = anaFilterRows(anaTabBase(key), anaTableFilters[key]);
-            if (tab.kind === 'productivity') anaRenderProdTopCards(tab, filtered);
             const rows = anaTableRows(key, filtered);
             const st = anaTableState[key];
             rows.sort((a, b) => {
@@ -4607,21 +4656,21 @@
             } else if (tab.kind === 'productivity') {
                 header = [
                     '№', 'ФИО', 'ЛДАП', 'Должность', 'Подразделение', 'Тип подразделения',
-                    'Паллеты', 'Часы на паллетах', 'Паллет/ч',
-                    'Штуки SKU', 'Часы на SKU', 'Штук SKU/ч', 'SKU/ч',
+                    'Паллеты', 'Паллет/ч',
+                    'Штуки SKU', 'Штук SKU/ч', 'SKU/ч',
                     'Сборки', 'Сборки/ч',
-                    'Активных часов', 'Средняя занятость в день, ч',
+                    'Заказы', 'Заказы/ч',
+                    'Активных часов',
                 ];
                 rows = cache.rows.map((e, i) => [
                     i + 1, e.fio, e.ldap, e.pos, e.dept, e.deptType,
                     e.palletSlots ? e.palletOps : '—',
-                    e.palletSlots ? Number(e.palletHours.toFixed(2)) : '—',
                     rateCell(e.palletsPerHour),
                     e.skuSlots ? e.skuQty : '—',
-                    e.skuSlots ? Number(e.skuHours.toFixed(2)) : '—',
                     rateCell(e.piecesPerHour), rateCell(e.skuPerHour),
                     e.assemblySlots ? e.assemblyOps : '—', rateCell(e.assembliesPerHour),
-                    Number(e.activeHours.toFixed(2)), e.avgHoursPerDay == null ? '—' : Number(e.avgHoursPerDay.toFixed(2)),
+                    e.orderSlots ? e.orderOps : '—', rateCell(e.ordersPerHour),
+                    Number(e.activeHours.toFixed(2)),
                 ]);
             } else if (tab.kind === 'days') {
                 header = ['№', 'Дата', 'День недели', 'Операций', 'Штук', 'Взвешенные операции', 'Сотрудников', 'Активных слотов', 'Операций на сотрудника', 'КПД'];
