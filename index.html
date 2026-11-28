@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Портал отчётов · Логистика Analytics</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="./icon.svg">
+<link rel="apple-touch-icon" sizes="192x192" href="./icon-192x192.png">
+<meta name="theme-color" content="#1a202c">
+<meta name="description" content="Портал складских отчётов логистики: AVS, пополнение адресов, операции, ротация паллет, ячейки склада, коррекции и аномалии.">
+<meta name="application-name" content="Логистика Analytics">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Логистика">
+<script src="./shared/js/config.js"></script>
+<script src="./shared/js/pwa-update.js"></script>
+<style>
+    :root {
+        --brand-yellow: #FFC107;
+        --brand-orange: #ff9f43;
+        --header-1: #1a202c;
+        --header-2: #2d3748;
+        --blue-1: #4299e1;
+        --blue-2: #3182ce;
+        --text: #2d3748;
+        --muted: #718096;
+        --border: #e2e8f0;
+        --radius: 10px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+        font-family: 'Segoe UI', 'Roboto', Helvetica, Arial, sans-serif;
+        background: linear-gradient(150deg, #fcdc68 0%, #ffcd17 50%, #ff9f43 100%);
+        min-height: 100vh;
+        padding: 25px;
+        color: var(--text);
+    }
+    .container {
+        max-width: 1800px; margin: 0 auto; background: #fff; border-radius: 16px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.2); overflow: hidden;
+        display: flex; flex-direction: column; min-height: calc(100vh - 50px);
+    }
+
+    /* --- Header --- */
+    .topbar {
+        background: linear-gradient(135deg, var(--header-1) 0%, var(--header-2) 100%);
+        color: #fff; padding: 28px 35px;
+        display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+        border-bottom: 4px solid var(--brand-yellow);
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-logo {
+        width: 46px; height: 46px; border-radius: 10px;
+        background: linear-gradient(135deg, var(--brand-yellow), var(--brand-orange));
+        display: grid; place-items: center; font-size: 22px; color: #1a202c;
+        box-shadow: 0 4px 14px -4px rgba(255,193,7,.7);
+    }
+    .brand-title { font-size: 1.3em; font-weight: 700; }
+    .brand-title span { color: var(--brand-yellow); }
+    .brand-sub { opacity: .85; font-size: .78em; color: #a0aec0; }
+
+    /* --- Quote (только при загрузке) --- */
+    .quote-box {
+        font-size: 0.85em;
+        color: #a0aec0;
+        background: rgba(255,255,255,.08);
+        border: 1px solid rgba(255,255,255,.14);
+        padding: 8px 14px;
+        border-radius: 999px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 28px;
+        margin-left: auto;
+    }
+    .quote-text { font-style: italic; }
+    .quote-author { opacity: 0.9; font-weight: 600; font-size: 0.78em; }
+
+    /* --- PWA install prompt --- */
+    #pwa-install {
+        display: none;
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--header-1);
+        color: #fff;
+        padding: 10px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        z-index: 1000;
+        font-size: 0.9em;
+        cursor: pointer;
+    }
+    #pwa-install:hover { background: var(--header-2); }
+
+    /* --- Hero --- */
+    main { padding: 34px 32px 40px; flex: 1; }
+    .hero { margin-bottom: 26px; }
+    .hero h1 { font-size: 2em; font-weight: 700; color: var(--header-2); margin-bottom: 8px; }
+    .hero h1 span { background: linear-gradient(90deg, #ed8936, #dd6b20); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .hero p { color: var(--muted); font-size: .95em; max-width: 820px; line-height: 1.6; }
+
+    /* --- Cards --- */
+    .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 18px; }
+    .svc-card {
+        position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 12px;
+        background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
+        padding: 20px; box-shadow: 0 3px 12px rgba(0,0,0,.08);
+        text-decoration: none; color: inherit;
+        transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+    }
+    .svc-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--grad); }
+    .svc-card:hover { transform: translateY(-4px); box-shadow: 0 14px 30px -12px var(--glow); border-color: var(--accent); }
+    .svc-card:active { transform: translateY(-1px); }
+    .svc-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+    .svc-icon {
+        width: 52px; height: 52px; border-radius: 10px; background: var(--grad);
+        display: grid; place-items: center; font-size: 25px;
+        box-shadow: 0 6px 16px -6px var(--glow);
+    }
+    .svc-version { font-size: .72em; color: var(--muted); border: 1px solid var(--border); padding: 3px 9px; border-radius: 999px; background: #f7fafc; }
+    .svc-card h3 { font-size: 1.14em; font-weight: 700; color: var(--header-2); }
+    .svc-card p { color: var(--muted); font-size: .87em; line-height: 1.55; flex: 1; }
+    .svc-open {
+        display: flex; align-items: center; justify-content: center; gap: 8px;
+        background: linear-gradient(135deg, var(--blue-1), var(--blue-2));
+        color: #fff; font-weight: 600; font-size: .9em;
+        padding: 11px 18px; border-radius: 6px;
+        box-shadow: 0 2px 8px rgba(66,153,225,.3);
+        transition: all .2s ease;
+    }
+    .svc-card:hover .svc-open { box-shadow: 0 6px 16px rgba(66,153,225,.45); filter: brightness(1.06); }
+
+    /* --- Footer --- */
+    footer {
+        background: #f7fafc; border-top: 1px solid var(--border);
+        padding: 20px 32px; text-align: center; color: var(--muted); font-size: .85em; line-height: 1.6;
+    }
+    footer a { color: var(--blue-1); text-decoration: none; font-weight: 600; }
+    footer a:hover { text-decoration: underline; }
+
+    @media (max-width: 768px) {
+        body { padding: 12px; }
+        .topbar { padding: 16px; }
+        main { padding: 22px 16px 30px; }
+        .cards-grid { grid-template-columns: 1fr; }
+        #pwa-install { width: 90%; left: 5%; text-align: center; }
+        .news-body { padding: 18px 20px; gap: 16px; }
+        .news-header { padding: 14px 20px; font-size: 1em; }
+    }
+    @media (max-width: 480px) {
+        body { padding: 8px; }
+        .topbar { padding: 12px; }
+        main { padding: 16px 10px 24px; }
+        .svc-card { padding: 16px; }
+        .news-header { padding: 12px 14px; font-size: 0.95em; }
+        .news-body { padding: 14px; gap: 12px; }
+        .change-item { flex-direction: column; gap: 6px; }
+    }
+
+    /* --- Новости / изменения портала (отдельный блок) --- */
+    .news-section {
+        margin: 34px 0 0 0;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: #fff;
+        box-shadow: 0 3px 12px rgba(0,0,0,.08);
+        overflow: hidden;
+    }
+    .news-header {
+        background: linear-gradient(135deg, var(--header-1) 0%, var(--header-2) 100%);
+        color: #fff;
+        padding: 18px 32px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 1.15em;
+        font-weight: 700;
+        letter-spacing: 0.2px;
+    }
+    .news-header .news-icon { font-size: 1.5em; flex-shrink: 0; }
+    .news-body { padding: 26px 32px; display: flex; flex-direction: column; gap: 22px; }
+    .news-intro {
+        background: linear-gradient(180deg, #eef6fb 0%, #e3f2fd 100%);
+        border-left: 4px solid var(--blue-1);
+        padding: 16px 20px;
+        border-radius: 8px;
+        font-size: 0.95em;
+        color: var(--text);
+        line-height: 1.6;
+    }
+    .news-intro b { color: var(--header-2); }
+    .news-intro a { color: var(--blue-2); font-weight: 700; text-decoration: underline; }
+    .news-intro a:hover { color: var(--blue-1); }
+    .changes-list { margin-top: 4px; }
+    .changes-list h3 {
+        font-size: 1em;
+        color: var(--header-2);
+        margin: 0 0 12px 0;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .changes-list h3::before { content: "📝"; }
+    .change-item {
+        padding: 10px 14px;
+        border-bottom: 1px solid #eef2f7;
+        font-size: 0.9em;
+        color: var(--text);
+        line-height: 1.5;
+        display: flex; gap: 10px; align-items: flex-start;
+    }
+    .change-item:last-child { border-bottom: none; }
+    .change-date {
+        flex-shrink: 0;
+        color: var(--muted);
+        font-size: 0.8em;
+        font-weight: 600;
+        min-width: 95px;
+        text-align: right;
+        padding-top: 2px;
+    }
+    .change-text { flex: 1; }
+    .change-text b { color: var(--header-2); }
+    /* Список новостей - ограничен по высоте, прокрутка внутри блока */
+    #newsChangesList {
+        max-height: 340px;
+        overflow-y: auto;
+        padding-right: 8px;
+        scrollbar-width: thin;
+        scrollbar-color: #cbd5e0 #f1f5f9;
+        overscroll-behavior: contain;
+    }
+    #newsChangesList::-webkit-scrollbar { width: 9px; }
+    #newsChangesList::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 9px; }
+    #newsChangesList::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 9px; border: 2px solid #f1f5f9; }
+    #newsChangesList::-webkit-scrollbar-thumb:hover { background: #b6c2ce; }
+</style>
+</head>
+<body>
+<div class="container">
+    <header class="topbar">
+        <div class="brand">
+            <div class="brand-logo">📊</div>
+            <div>
+                <div class="brand-title">Портал отчётов · <span>Логистика Analytics</span></div>
+                <div class="brand-sub">Единая точка доступа к складской аналитике</div>
+            </div>
+        </div>
+        <div class="quote-box" id="quoteBox">
+            <span class="quote-text" id="quoteText">«Загрузка…»</span>
+            <span class="quote-author" id="quoteAuthor">-</span>
+        </div>
+    </header>
+
+    <main>
+        <div class="hero">
+            <h1>Отчёты складской <span>логистики</span></h1>
+            <p>Выберите нужный сервис - карточка откроет отчёт. Каждый отчёт самостоятельно загружает и хранит свои данные внутри браузера. Подробнее узнать об отчёте можно нажав на кнопку инфо в левом верхнем углу</p>
+        </div>
+        <div class="cards-grid" id="servicesGrid"></div>
+
+            <section class="news-section">
+                <div class="news-header">
+                    <span class="news-icon">📰</span>
+                    Новости и изменения портала
+                </div>
+                <div class="news-body">
+                    <div class="news-intro">
+                        <b>⚠️ Важно:</b> выгружаемые из WMS таблицы могут менять порядок и названия колонок. Если отчёт перестал корректно определять колонки, возникли ошибки или есть предложения -
+                        пишите на почту <a href="mailto:60041915@lemanapro.ru?subject=Портал%20Логистика%20Analytics%20-%20изменения%20колонок">60041915@lemanapro.ru</a>
+                    </div>
+                    <div class="changes-list">
+                        <h3>Последние изменения</h3>
+                        <div id="newsChangesList"></div>
+                    </div>
+                </div>
+            </section>
+    </main>
+
+    <footer>
+        Портал отчётов · Логистика Analytics · <span id="portalVersion"></span> (PWA)<br>
+        Поддержка: <a href="mailto:60041915@lemanapro.ru?subject=Portal">60041915@lemanapro.ru</a>
+    </footer>
+</div>
+
+<div id="pwa-install">📱 Установить как приложение</div>
+
+<script>
+/* =====================================================================
+   РЕЕСТР ОТЧЁТОВ И ВЕРСИИ.
+   Источник данных - shared/js/config.js.
+   ===================================================================== */
+const SERVICES = self.PORTAL_CONFIG.services;
+
+function formatPortalVersion(version) {
+    return `v${String(version).split('.').slice(0, 2).join('.')}`;
+}
+
+const portalVersionLabel = formatPortalVersion(self.PORTAL_VERSION);
+const portalVersionNode = document.getElementById('portalVersion');
+if (portalVersionNode) portalVersionNode.textContent = portalVersionLabel;
+
+function esc(s) { return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+function renderGrid() {
+    document.getElementById('servicesGrid').innerHTML = SERVICES.map(s => `
+        <a class="svc-card" href="${esc(s.url)}"  rel="noopener" style="--accent:${s.accent}; --grad:${s.grad}; --glow:${s.glow}">
+            <div class="svc-top">
+                <div class="svc-icon">${s.icon}</div>
+                <span class="svc-version">${esc(formatPortalVersion(s.version))}</span>
+            </div>
+            <h3>${esc(s.title)}</h3>
+            <p>${esc(s.desc)}</p>
+            <span class="svc-open">Открыть отчёт →</span>
+        </a>
+    `).join('');
+}
+
+renderGrid();
+
+/* === Блок новостей / изменений (редактируется вручную) === */
+const NEWS_CHANGES = [
+    { date: '28.11.2026', text: 'Портал v1.0.8: клик по дате в периоде анализа фильтрует карточки на выбранный день.' },
+    { date: '27.11.2026', text: 'Портал v1.0.6: добавление вкладки «Контекстная продуктивность».' },
+    { date: '25.11.2026', text: 'Портал v1.0.1: несуществующие адреса открывают страницу 404.' },
+    { date: '25.11.2026', text: 'Портал v1.0.0: единая версия портала и всех сервисов.' },
+    { date: '25.11.2026', text: 'Добавлен сервис «AVS Контроль» версии 1.0.' },
+    { date: '25.11.2026', text: 'Добавлен сервис «Пополнение Основных Адресов» версии 1.0.' },
+    { date: '25.11.2026', text: 'Добавлен сервис «Анализ Ротации Паллет» версии 1.0.' },
+    { date: '25.11.2026', text: 'Добавлен сервис «Анализ Ячеек Склада» версии 1.0.' },
+    { date: '25.11.2026', text: 'Добавлен сервис «Анализ Коррекций» версии 1.0.' },
+    { date: '25.11.2026', text: 'Добавлен сервис «Аномалии склада» версии 1.0.' },
+    { date: '25.11.2026', text: 'Добавлен сервис «Оперативные инвентаризации по адресу» версии 1.0.' },
+    { date: '25.11.2026', text: 'Добавлен сервис «Оперативные инвентаризации по товару» версии 1.0.' },
+    { date: '25.11.2026', text: 'Добавлен сервис «Аналитика логистических операций» версии 1.0.' },
+];
+
+function renderNews() {
+    const container = document.getElementById('newsChangesList');
+    if (!container) return;
+    container.innerHTML = NEWS_CHANGES.map(c => `
+        <div class="change-item">
+            <span class="change-date">${c.date}</span>
+            <div class="change-text">${c.text}</div>
+        </div>
+    `).join('');
+}
+
+renderNews();
+
+/* PWA: офлайн и установка как приложение */
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    document.getElementById('pwa-install').style.display = 'block';
+});
+document.getElementById('pwa-install').addEventListener('click', () => {
+    if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then(() => { deferredPrompt = null; document.getElementById('pwa-install').style.display = 'none'; });
+    }
+});
+/* === Цитаты (только при загрузке страницы) === */
+const QUOTES = [
+    { t: "Без данных вы просто другой человек с мнением.", a: "У. Эдвардс Деминг" },
+    { t: "Цель анализа данных - преобразовать их в информацию, а информацию в понимание.", a: "Клайв Хамби" },
+    { t: "Аналитика - это не про цифры. Это про решения.", a: "Автор неизвестен" },
+    { t: "Данные - это новая нефть.", a: "Клайв Хамби" },
+    { t: "Измеряйте то, что важно, а не то, что легко измерить.", a: "Автор неизвестен" },
+    { t: "Хорошие данные приводят к хорошим решениям.", a: "Автор неизвестен" },
+    { t: "Аналитика освещает путь к эффективности.", a: "Автор неизвестен" },
+    { t: "Сохраняйте данные, чтобы не повторять ошибки.", a: "Автор неизвестен" },
+    { t: "Данные не лгут, но люди их интерпретируют.", a: "Автор неизвестен" },
+    { t: "Аналитика превращает хаос в порядок.", a: "Автор неизвестен" },
+    { t: "Эффективность начинается с измерения.", a: "Питер Друкер" },
+    { t: "Данные - основа принятия взвешенных решений.", a: "Автор неизвестен" },
+    { t: "Знать больше - значит работать лучше.", a: "Автор неизвестен" },
+    { t: "Данные помогают видеть невидимое.", a: "Автор неизвестен" },
+    { t: "Аналитика помогает находить узкие места.", a: "Автор неизвестен" },
+    { t: "Данные - это компас в мире логистики.", a: "Автор неизвестен" },
+    { t: "Принятие решений без данных - это азарт.", a: "Автор неизвестен" },
+    { t: "Каждая операция должна быть измерена.", a: "Автор неизвестен" },
+    { t: "Логистика эффективна, когда она измерима.", a: "Автор неизвестен" },
+    { t: "Аналитика - это глаза бизнеса.", a: "Автор неизвестен" },
+    { t: "Измеряйте, анализируйте, улучшайте.", a: "Автор неизвестен" },
+    { t: "Данные помогают видеть будущее через прошлое.", a: "Автор неизвестен" },
+    { t: "Аналитика превращает операции в стратегию.", a: "Автор неизвестен" },
+    { t: "Единственное истинное знание - это знание того, что ты ничего не знаешь.", a: "Сократ" },
+    { t: "Всё течёт, всё меняется.", a: "Гераклит Эфесский" },
+    { t: "Знание - это сила.", a: "Фрэнсис Бэкон" },
+    { t: "Всё числится.", a: "Пифагор" },
+    { t: "Чем больше я знаю, тем больше понимаю, сколько не знаю.", a: "Аристотель" },
+    { t: "Склад без учёта - это чёрный ящик для денег.", a: "Автор неизвестен" },
+    { t: "Паллетное место стоит дорого, пока оно пустует.", a: "Автор неизвестен" },
+    { t: "Зона хранения без разметки - это зона хаоса.", a: "Автор неизвестен" },
+    { t: "Точность данных важнее скорости ввода.", a: "Автор неизвестен" },
+    { t: "Складские данные устаревают быстрее, чем товар лежит на полке.", a: "Автор неизвестен" }
+];
+
+const q = QUOTES[Math.floor(Math.random() * QUOTES.length)];
+const el = document.getElementById('quoteText');
+const a = document.getElementById('quoteAuthor');
+if (el && a) {
+    el.textContent = '«' + q.t + '»';
+    a.textContent = '- ' + q.a;
+}
+
+/* Глобальный перехват ошибок */
+window.addEventListener('error', (e) => {
+    console.error('[Портал] Глобальная ошибка JS:', e.message,
+        e.filename ? `(${e.filename}:${e.lineno}:${e.colno})` : '');
+    if (e.error) {
+        console.error(e.error);
+    }
+});
+
+window.addEventListener('unhandledrejection', (e) => {
+    console.error('[Портал] Необработанный промис:', e.reason);
+});
+</script>
+</body>
+</html>

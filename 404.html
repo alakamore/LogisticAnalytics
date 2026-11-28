@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>404 · Страница не найдена — Логистика Analytics</title>
+<link rel="icon" type="image/svg+xml" href="/icon.svg">
+<meta name="theme-color" content="#1a202c">
+<meta name="robots" content="noindex">
+<style>
+    :root {
+        --header-1: #1a202c;
+        --header-2: #2d3748;
+        --brand-yellow: #ffc107;
+        --brand-orange: #ff9f43;
+        --blue: #3182ce;
+        --muted: #718096;
+        --line: #e2e8f0;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 28px;
+        font-family: 'Segoe UI', 'Roboto', Helvetica, Arial, sans-serif;
+        color: #2d3748;
+        background:
+            radial-gradient(900px 520px at 85% 10%, rgba(255, 193, 7, .22), transparent 65%),
+            radial-gradient(700px 520px at 5% 95%, rgba(66, 153, 225, .22), transparent 60%),
+            linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+    }
+
+    .card {
+        width: 100%;
+        max-width: 780px;
+        background: #fff;
+        border-radius: 18px;
+        box-shadow: 0 30px 80px rgba(0, 0, 0, .45);
+        overflow: hidden;
+    }
+
+    .head {
+        background: linear-gradient(135deg, var(--header-1) 0%, var(--header-2) 100%);
+        color: #fff;
+        padding: 26px 34px;
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        border-bottom: 4px solid var(--brand-yellow);
+    }
+
+    .logo {
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
+        display: grid;
+        place-items: center;
+        font-size: 21px;
+        background: linear-gradient(135deg, var(--brand-yellow), var(--brand-orange));
+        box-shadow: 0 4px 14px -4px rgba(255, 193, 7, .8);
+    }
+
+    .brand-title { font-size: 1.05em; font-weight: 600; }
+    .brand-sub { font-size: .78em; color: #a0aec0; margin-top: 2px; }
+
+    .body { padding: 38px 34px 34px; }
+
+    .code {
+        font-size: 84px;
+        font-weight: 800;
+        line-height: 1;
+        letter-spacing: -3px;
+        background: linear-gradient(90deg, #ed8936, #dd6b20);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+    }
+
+    h1 { font-size: 1.5em; margin: 12px 0 10px; color: var(--header-2); }
+
+    p { color: var(--muted); line-height: 1.65; font-size: .96em; max-width: 560px; }
+
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-size: .92em;
+        font-weight: 600;
+        text-decoration: none;
+        transition: filter .18s ease, border-color .18s ease;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #4299e1, #3182ce);
+        color: #fff;
+        box-shadow: 0 6px 16px -8px rgba(66, 153, 225, .9);
+    }
+
+    .btn-ghost {
+        color: var(--header-2);
+        border: 1px solid var(--line);
+        background: #f7fafc;
+    }
+
+    .btn:hover { filter: brightness(1.06); }
+    .btn-ghost:hover { border-color: var(--blue); }
+
+    .links {
+        margin-top: 30px;
+        padding-top: 22px;
+        border-top: 1px solid var(--line);
+    }
+
+    .links h2 {
+        font-size: .82em;
+        font-weight: 700;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        color: #a0aec0;
+        margin-bottom: 12px;
+    }
+
+    .links-list { display: flex; flex-wrap: wrap; gap: 8px; }
+
+    .links-list a {
+        font-size: .85em;
+        color: var(--header-2);
+        text-decoration: none;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 7px 13px;
+        background: #fff;
+        transition: border-color .18s ease, color .18s ease;
+    }
+
+    .links-list a:hover { border-color: var(--blue); color: var(--blue); }
+
+    @media (max-width: 560px) {
+        body { padding: 14px; }
+        .head { padding: 18px 20px; }
+        .body { padding: 26px 20px; }
+        .code { font-size: 64px; }
+    }
+</style>
+</head>
+<body>
+
+<div class="card">
+    <div class="head">
+        <div class="logo">📊</div>
+        <div>
+            <div class="brand-title">Портал отчётов · <strong>Логистика Analytics</strong></div>
+            <div class="brand-sub">Единая точка доступа к складской аналитике</div>
+        </div>
+    </div>
+
+    <div class="body">
+        <div class="code">404</div>
+        <h1>Такой страницы нет</h1>
+        <p>Возможно, ссылка устарела или в адресе опечатка. Отчёт, который вы искали, доступен с главной страницы портала.</p>
+
+        <div class="actions">
+            <a class="btn btn-primary" href="/">← На главную</a>
+        </div>
+
+        <div class="links">
+            <h2>Все отчёты</h2>
+            <div class="links-list">
+                <a href="/Services/avs_control/index.html">AVS Контроль</a>
+                <a href="/Services/main_address/index.html">Пополнение адресов</a>
+                <a href="/Services/pallet_rotation/index.html">Ротация паллет</a>
+                <a href="/Services/analyse_cells/index.html">Ячейки склада</a>
+                <a href="/Services/corrections/index.html">Коррекции</a>
+                <a href="/Services/anomalies/index.html">Аномалии</a>
+                <a href="/Services/operativInventory/index.html">Инвентаризации по адресу</a>
+                <a href="/Services/operativInventoryForGoods/index.html">Инвентаризации по товару</a>
+                <a href="/Services/analyseLogisticOperation/index.html">Логистические операции</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

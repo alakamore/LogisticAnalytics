@@ -1,0 +1,1667 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Анализ Ротации Паллет</title>
+    <!-- Общие стили портала -->
+    <link rel="stylesheet" href="../../shared/css/common.css">
+    <!-- Единая конфигурация портала и управление обновлениями PWA -->
+    <script src="../../shared/js/config.js"></script>
+    <script src="../../shared/js/pwa-update.js"></script>
+    <!-- Библиотеки (единые локальные копии в shared/js-lib/) -->
+    <script src="../../shared/js-lib/xlsx.full.min.js"></script>
+    <script src="../../shared/js-lib/chart.umd.min.js"></script>
+    <!-- Общие утилиты и IndexedDB-хранилище -->
+    <script src="../../shared/js/idb.js"></script>
+    <script src="../../shared/js/common.js"></script>
+    <style>
+        /* =====================================================
+           Сервис: Анализ Ротации Паллет - уникальные стили
+           Общее вынесено в shared/css/common.css
+           ===================================================== */
+        :root {
+            --pallet-critical: #B45309;
+            --pallet-warning: #D97706;
+            --pallet-normal: #059669;
+            --pallet-info: #2563EB;
+            --brand-dark: #1A1A1A;
+            --text-main: #333333;
+            --text-muted: #6B7280;
+            --border-color: #E5E7EB;
+            --bg-light: #FFFBEB;
+            --bg-medium: #FEF3C7;
+            --bg-dark: #FDE68A;
+            --header-bg: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+            --header-2: #2d3748;
+            --brand-primary: #4299e1;
+            --brand-primary-dark: #3182ce;
+            --shadow-color: rgba(0,0,0,0.2);
+            --container-bg: #ffffff;
+            --card-bg: #ffffff;
+            --card-border: #e5e7eb;
+            --section-bg: #f7fafc;
+            --section-bg-2: #edf2f7;
+            --input-bg: #ffffff;
+            --input-border: #FCD34D;
+            --table-hover: #f7fafc;
+            --table-even: #fafbfc;
+            --title-color: #2d3748;
+            --filter-label-color: #4a5568;
+            --footer-bg: #FFFBEB;
+            --footer-border: #FDE68A;
+            --btn-clear-bg: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+            --btn-clear-hover: linear-gradient(135deg, #e53e3e 0%, #c53030 100%);
+        }
+
+        body {
+            background: linear-gradient(150deg, #fcdc68 0%, #ffcd17 50%, #ff9f43 100%);
+        }
+
+        /* --- Header --- */
+        .header {
+            background: var(--header-bg);
+            border-bottom: 4px solid #FCD34D;
+            position: relative;
+        }
+        .header-left h1 span { color: #FCD34D; }
+        .header-left p { color: #FDE68A; }
+
+        .btn-back {
+            background: rgba(255,255,255,0.15);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        .btn-back:hover {
+            background: rgba(255,255,255,0.25);
+            transform: translateY(-50%) scale(1.05);
+        }
+        .btn-back:active {
+            transform: translateY(-50%) scale(0.95);
+        }
+
+        .header-left {
+            padding-left: 75px;
+        }
+
+        /* --- Data notice / session warning --- */
+        .session-warning {
+            background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%);
+            border-left: 4px solid #D97706;
+            padding: 15px 25px;
+            margin: 10px 30px;
+            border-radius: 8px;
+            display: none;
+            align-items: center;
+            gap: 15px;
+            color: #92400E;
+            font-weight: 600;
+        }
+        .session-warning.active { display: flex; }
+
+        .data-notice {
+            background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%);
+            border-left: 4px solid #FDE68A;
+            padding: 12px 20px;
+            margin: 10px 30px;
+            border-radius: 8px;
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            color: #92400E;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .data-notice.active { display: flex; }
+        .data-notice-text { color: #92400E; font-size: 0.95em; flex: 1; }
+        .data-notice-text strong { color: #B45309; }
+
+        /* --- Upload Section --- */
+        .upload-section {
+            padding: 40px;
+            text-align: center;
+            background: linear-gradient(180deg, #FFFBEB 0%, #FEF3C7 100%);
+            border-bottom: 1px solid #FDE68A;
+        }
+        .upload-area {
+            border: 2px dashed #FCD34D;
+            border-radius: 10px;
+            padding: 45px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: white;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        .upload-area:hover {
+            border-color: #D97706;
+            background: #FFFBEB;
+            transform: translateY(-3px);
+        }
+        .upload-area.dragover {
+            border-color: #B45309;
+            background: #FFFBEB;
+        }
+        .upload-icon { font-size: 3em; margin-bottom: 15px; }
+        .upload-text { font-size: 1.1em; color: #78350F; margin-bottom: 8px; }
+        .upload-hint { color: #92400E; font-size: 0.85em; }
+        #fileInput { display: none; }
+
+        /* --- Секции скрыты до загрузки данных --- */
+        .filters-section { display: none; }
+        .table-container { display: none; }
+        #pagination { display: none; }
+
+        /* --- Stats cards --- */
+        .stats-grid { margin-bottom: 25px; }
+        .stat-card {
+            color: #2d3748;
+            padding: 22px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.06);
+            transition: transform 0.2s ease;
+            border: 2px solid #715b00;
+            cursor: pointer;
+        }
+        .stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        }
+        .stat-card.pallet-critical { background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%); }
+        .stat-card.pallet-warning { background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);}
+        .stat-card.pallet-normal { background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%);}
+        .stat-card.pallet-info { background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%);}
+
+        .stat-value { font-size: 2.2em; font-weight: 700; margin-bottom: 5px; line-height: 1; }
+        .stat-value.critical { color: #B45309; }
+        .stat-value.warning { color: #D97706; }
+        .stat-value.normal { color: #059669; }
+        .stat-label { font-size: 0.8em; color: #6B7280; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        /* --- Топ-10 паллет по сроку хранения --- */
+        .priority-section { margin-bottom: 25px; }
+        .top-cards-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 15px;
+        }
+        .top-card {
+            background: linear-gradient(135deg, #fff3cd 0%, #fffc9c 100%);
+            border-left: 4px solid #fc8181;
+            padding: 14px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgb(252 208 68 / 15%);
+            border: 1px solid #654200;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            cursor: pointer;
+        }
+        .top-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgb(252 208 68 / 35%);
+            background: linear-gradient(135deg, #fffc9c 0%, #fff3cd 100%);
+        }
+        .top-card .priority-name,
+        .top-card .priority-qty,
+        .top-card .priority-zone,
+        .top-card .priority-lm,
+        .top-card .priority-rank,
+        .top-card .priority-dept {
+            color: #1F2937 !important;
+        }
+        .priority-lm {
+            font-weight: 600;
+            color: #2d3748;
+            font-size: 0.95em;
+            background: linear-gradient(135deg, #ffffff 0%, #f7fafc 100%);
+            padding: 3px 8px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+        }
+        .top-card .priority-rank {
+            background: #FCD34D;
+            color: #92400E !important;
+            font-size: 1.4em;
+            font-weight: 700;
+            padding: 5px 10px;
+            border-radius: 6px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+        .top-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .priority-days {
+            background: #92400E !important;
+            color: white !important;
+            border: none;
+            font-weight: 400;
+            font-size: 0.85em;
+            padding: 4px 8px;
+            border-radius: 6px;
+            text-align: center;
+            margin: 8px 0;
+        }
+        .priority-name {
+            color: #4B5563;
+            font-size: 0.85em;
+            margin-bottom: 12px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: normal;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            line-height: 1.4;
+            flex-grow: 1;
+            word-break: break-word;
+        }
+        .priority-stats {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .priority-qty {
+            font-size: 0.85em;
+            font-weight: 600;
+            color: #6B7280;
+        }
+        .priority-dept {
+            font-size: 0.8em;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: #FEF3C7;
+            color: #92400E !important;
+            border: 1px solid #FCD34D;
+        }
+        .priority-zone {
+            font-size: 0.75em;
+            color: #9CA3AF;
+            background: #F9FAFB;
+            padding: 6px;
+            border-radius: 6px;
+            margin-top: auto;
+            border: 1px solid #F3F4F6;
+            text-align: center;
+        }
+
+        @media (max-width: 1400px) {
+            .top-cards-grid { grid-template-columns: repeat(4, 1fr); }
+        }
+        @media (max-width: 1200px) {
+            .top-cards-grid { grid-template-columns: repeat(3, 1fr); }
+        }
+        @media (max-width: 900px) {
+            .top-cards-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 600px) {
+            .top-cards-grid { grid-template-columns: 1fr; gap: 10px; }
+            .top-card { padding: 12px; }
+            .priority-rank { font-size: 1.1em; padding: 4px 8px; }
+            .priority-lm { font-size: 0.85em; }
+        }
+
+        /* --- Charts: все в одну строку --- */
+        .charts-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+        .chart-container {
+            background: white;
+            padding: 22px;
+            border-radius: 10px;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.08);
+            border: 1px solid #E5E7EB;
+            max-height: 500px;
+            height: auto;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .charts-row .chart-container { padding-bottom: 62px; }
+        .chart-title {
+            font-size: 1.05em;
+            color: #2d3748;
+            margin-bottom: 15px;
+            text-align: center;
+            font-weight: 600;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #E5E7EB;
+            flex-shrink: 0;
+        }
+        .chart-container canvas {
+            flex: 1;
+            width: 100% !important;
+            height: auto !important;
+        }
+
+        /* --- Filters --- */
+        .filters-section {
+            display: none;
+            background: linear-gradient(180deg, #f7fafc 0%, #edf2f7 100%);
+            padding: 18px 22px;
+            margin: 0 30px 20px 30px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: flex-end;
+            border: 1px solid #FDE68A;
+            justify-content: space-between;
+        }
+        .filters-left {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: flex-end;
+        }
+        .filters-right {
+            display: flex;
+            align-items: flex-end;
+            gap: 10px;
+        }
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            min-width: 150px;
+        }
+        .filter-group label {
+            font-weight: 600;
+            color: #4a5568;
+            margin-bottom: 5px;
+            font-size: 0.78em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .filter-group input,
+        .filter-group select {
+            padding: 9px 12px;
+            border: 1.5px solid #FCD34D;
+            border-radius: 6px;
+            font-size: 0.9em;
+            background: white;
+            transition: border-color 0.2s ease;
+            width: 100%;
+        }
+        .filter-group input:focus,
+        .filter-group select:focus {
+            outline: none;
+            border-color: #4299e1;
+            box-shadow: 0 0 0 3px rgba(66,153,225,0.15);
+        }
+        .filter-group input[type=range] {
+            padding: 0;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            width: 100%;
+        }
+        .range-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            width: 100%;
+        }
+        .range-val {
+            font-weight: 700;
+            color: #B45309;
+            min-width: 32px;
+            text-align: center;
+        }
+        .filter-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 170px;
+        }
+        .filter-checkbox input {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        /* --- Table --- */
+        .table-container {
+            display: none;
+            overflow-x: auto;
+            margin: 0 30px 20px 30px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.08);
+            border: 1px solid #E5E7EB;
+            max-height: 700px;
+            overflow-y: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85em;
+        }
+        thead {
+            background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+            color: white;
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
+        th, td {
+            padding: 12px 14px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+            white-space: nowrap;
+        }
+        th {
+            cursor: pointer;
+            user-select: none;
+            font-weight: 600;
+            font-size: 0.85em;
+        }
+        th:hover { background: #1a202c; }
+        tbody tr:hover { background: #f7fafc; }
+        tbody tr:nth-child(even) { background: #fafbfc; }
+        tbody tr:nth-child(even):hover { background: #edf2f7; }
+        td.num { text-align: right; }
+
+        /* --- Badges --- */
+        .pallet-badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 0.8em;
+            display: inline-block;
+        }
+        .pallet-normal-badge { background: #10B981; color: white; }
+        .pallet-warning-badge { background: #F59E0B; color: white; }
+        .pallet-critical-badge { background: #B45309; color: white; }
+        .pallet-no-data-badge { background: #9CA3AF; color: white; }
+        .stat-card.pallet-no-data { background: linear-gradient(135deg, #F1F5F9 0%, #E2E8F0 100%);}
+        .stat-card.pallet-no-data .stat-value { color: #64748B; }
+
+        /* --- Footer --- */
+        .footer {
+            background: #FFFBEB;
+            border-top: 1px solid #FDE68A;
+            padding: 20px 35px;
+            text-align: center;
+            color: #78350F;
+            font-size: 0.85em;
+        }
+        .footer a { color: #B45309; text-decoration: none; font-weight: 600; }
+        .footer a:hover { color: #78350F; text-decoration: underline; }
+
+        /* --- Responsive --- */
+        @media (max-width: 1400px) {
+            .charts-row { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 968px) {
+            .charts-row { grid-template-columns: repeat(1, 1fr); }
+        }
+        @media (max-width: 768px) {
+            .header { flex-direction: column; text-align: center; gap: 15px; }
+            .header-left { padding-left: 0; }
+            .charts-row { grid-template-columns: 1fr; }
+            .filters-section { flex-direction: column; align-items: stretch; }
+            .filters-left, .filters-right { flex-direction: column; align-items: stretch; }
+            .filter-group { min-width: 100%; flex: 1 1 100%; }
+            .filter-group .btn { width: 100%; }
+            .filter-checkbox { min-width: 100%; }
+            .btn { width: 100%; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 480px) {
+            .stats-grid { grid-template-columns: 1fr; }
+            .top-cards-grid { grid-template-columns: 1fr !important; }
+            .priority-name { white-space: normal; }
+            .priority-zone { white-space: normal; word-break: break-word; }
+            table th, table td { padding: 6px 8px; font-size: 0.8em; }
+            .chart-container { min-height: 240px; padding: 14px; }
+            .filter-checkbox { white-space: normal; }
+        }
+
+        /* === MODAL: Info (стиль как у остальных сервисов, по скриншотам) === */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.55);
+            backdrop-filter: blur(3px);
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-content {
+            background: #fff;
+            border-radius: 12px;
+            max-width: 760px;
+            width: 95%;
+            max-height: 92vh;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+        }
+        .modal-header {
+            background: #1a202c;
+            color: #fff;
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+        .modal-header-left {
+            display: flex; align-items: center; gap: 12px;
+        }
+        .modal-header-left .modal-icon {
+            font-size: 1.6em;
+        }
+        .modal-header h3 {
+            font-size: 1.25em;
+            font-weight: 700;
+            margin: 0;
+            letter-spacing: 0.2px;
+        }
+        .modal-close {
+            background: rgba(255,255,255,0.12);
+            border: none;
+            color: #fff;
+            width: 34px; height: 34px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.4em;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .modal-close:hover { background: rgba(255,255,255,0.25); }
+
+        .modal-body {
+            background: #eef6fb;
+            padding: 0;
+            overflow-y: auto;
+            flex: 1;
+        }
+        .modal-body-inner {
+            padding: 26px 30px;
+        }
+
+        /* --- Info / Instruction Modal Content --- */
+        .instruction-section {
+            background: linear-gradient(135deg, #ebf8ff 0%, #f0f9ff 100%);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #90cdf4;
+        }
+        .instruction-section h4 {
+            color: #2c5282;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #bee3f8;
+        }
+        .instruction-steps {
+            list-style: none;
+            counter-reset: step-counter;
+        }
+        .instruction-steps li {
+            position: relative;
+            padding-left: 45px;
+            margin-bottom: 15px;
+            line-height: 1.6;
+            color: #4a5568;
+        }
+        .instruction-steps li::before {
+            counter-increment: step-counter;
+            content: counter(step-counter);
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.9em;
+            box-shadow: 0 2px 6px rgba(66,153,225,0.4);
+        }
+        .instruction-steps li strong {
+            color: #2d3748;
+            display: block;
+            margin-bottom: 4px;
+        }
+        .instruction-steps li code {
+            background: #edf2f7;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.85em;
+            color: #2d3748;
+        }
+
+        .info-cards {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 14px;
+            margin-bottom: 26px;
+        }
+        .info-card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 16px 18px;
+            border: 1px solid #e2e8f0;
+            display: flex; gap: 12px; align-items: flex-start;
+        }
+        .info-card-icon {
+            font-size: 1.7em;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+        .info-card-content { flex: 1; }
+        .info-card h5 {
+            font-size: 0.95em;
+            font-weight: 700;
+            color: #1a202c;
+            margin: 0 0 6px 0;
+        }
+        .info-card p {
+            font-size: 0.85em;
+            color: #64748b;
+            margin: 0; line-height: 1.5;
+        }
+
+        .important-header {
+            font-size: 0.95em;
+            font-weight: 700;
+            color: #92400E;
+            margin: 22px 0 12px 0;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .important-header::before { content: "⚠️"; }
+
+        .warning-box {
+            background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+            border-left: 4px solid #FDE68A;
+            border-radius: 8px;
+            padding: 14px 18px;
+            margin-bottom: 14px;
+        }
+        .warning-box p {
+            margin: 0 0 8px 0;
+            color: #92400E;
+            font-size: 0.9em;
+            line-height: 1.55;
+        }
+        .warning-box p:last-child { margin-bottom: 0; }
+        .warning-box p strong { color: #B45309; }
+        .warning-box code {
+            background: rgba(255,255,255,0.6);
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-size: 0.85em;
+            color: #1a202c;
+        }
+
+        .warning-list { margin: 0; padding: 0; list-style: none; }
+        .warning-list li {
+            position: relative;
+            padding-left: 24px;
+            margin-bottom: 8px;
+            color: #92400E;
+            font-size: 0.88em;
+            line-height: 1.5;
+        }
+        .warning-list li::before {
+            content: "•"; position: absolute; left: 6px; top: 1px;
+            color: #B45309; font-weight: 800; font-size: 1.1em;
+        }
+        .warning-list li strong { color: #B45309; }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header" data-service-header data-icon="📆" data-title="Анализ" data-accent="Ротации Паллет" data-version-service="pallet_rotation"
+            data-subtitle="Выявление паллет с низкой ротацией."></div>
+
+        <div class="session-warning" id="sessionWarning">
+            <span>⚠️ Режим сессии:</span>
+            <span style="font-weight: 400;">Данные слишком большие для сохранения. При обновлении страницы информация пропадет.</span>
+        </div>
+
+        <div class="data-notice" id="dataNotice">
+            <div class="data-notice-text">
+                <strong id="noticeTitle">💾 Данные сохранены!</strong>
+                <span id="dataInfo">0 паллет | Дата: </span>
+            </div>
+            <button class="btn btn-clear" onclick="requestClearData(null, doClearPalletRotation)" style="padding: 8px 16px; margin: 0;">🗑️ Очистить</button>
+        </div>
+
+        <div class="upload-section" id="uploadSection">
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📦</div>
+                <div class="upload-text">Перетащите файл .xlsx сюда</div>
+                <div class="upload-hint">Система проанализирует срок хранения и выявит паллеты с нарушением ротации</div>
+                <input type="file" id="fileInput" accept=".xlsx,.xls">
+            </div>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p id="loadingText">Обработка паллет...</p>
+        </div>
+
+        <div class="dashboard" id="dashboard">
+            <div class="stats-grid" id="statsGrid"></div>
+
+            <div class="priority-section">
+                <div class="chart-container" style="height: auto; max-height: none; overflow: visible;">
+                    <div class="chart-title">🔥 Топ-10 паллет по сроку хранения</div>
+                    <div class="top-cards-grid" id="priorityCards"></div>
+                </div>
+            </div>
+
+            <div class="charts-row">
+                <div class="chart-container">
+                    <div class="chart-title">📊 Распределение по срокам хранения</div>
+                    <canvas id="ageChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-title">🏢 Топ-10 отделов по критичным паллетам</div>
+                    <canvas id="deptChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-title">🗺️ Топ-10 ячеек по сроку хранения</div>
+                    <canvas id="cellChart"></canvas>
+                </div>
+            </div>
+
+            <div class="filters-section">
+                <div class="filters-left">
+                    <div class="filter-group">
+                        <label for="searchInput">🔍 Поиск по ячейке</label>
+                        <input type="text" id="searchInput" placeholder="Введите код ячейки...">
+                    </div>
+                    <div class="filter-group">
+                        <label for="departmentFilter">🏢 Отдел</label>
+                        <select id="departmentFilter"><option value="">Все отделы</option></select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="ageFilter">⏰ Срок хранения</label>
+                        <select id="ageFilter">
+                            <option value="">Все</option>
+                            <option value="0-15">До 15 дней</option>
+                            <option value="15-30">15-30 дней</option>
+                            <option value="30-60">30-60 дней</option>
+                            <option value="60-90">60-90 дней</option>
+                            <option value="90+">90+ дней</option>
+                            <option value="no-date">Без даты операции</option>
+                        </select>
+                    </div>
+                    <div class="filter-group range-row">
+                        <label for="ageRange">⏱️ Хранение свыше (дней)</label>
+                        <div style="flex:1; display:flex; gap:8px; align-items:center;">
+                            <input type="range" id="ageRange" min="0" max="365" value="0">
+                            <span class="range-val" id="ageRangeVal">0</span>
+                        </div>
+                    </div>
+                    <label class="filter-checkbox" style="margin-left:auto;">
+                        <input type="checkbox" id="exclZdrop">
+                        <span>Исключить z-drop</span>
+                    </label>
+                    <div class="filter-group" style="min-width:auto;">
+                        <label>&nbsp;</label>
+                        <button class="btn btn-reset" onclick="resetFilters()">Сброс</button>
+                    </div>
+                </div>
+                <div class="filters-right">
+                    <button class="btn btn-export" onclick="exportToXLSX()">📥 Экспорт в XLSX</button>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table id="dataTable">
+                    <thead>
+                        <tr>
+                            <th data-sort-col="Код паллеты" onclick="sortTable('Код паллеты')" role="columnheader">📦 Код паллеты <span class="sort-indicator">⬍</span></th>
+                            <th data-sort-col="Отдел" onclick="sortTable('Отдел')" role="columnheader">🏢 Отдел <span class="sort-indicator">⬍</span></th>
+                            <th data-sort-col="Описание" onclick="sortTable('Описание')" role="columnheader">📋 Описание (артикул) <span class="sort-indicator">⬍</span></th>
+                            <th data-sort-col="Хранение (дней)" onclick="sortTable('Хранение (дней)')" role="columnheader">⏰ Хранение (дней) <span class="sort-indicator">⬍</span></th>
+                            <th data-sort-col="Ячейка" onclick="sortTable('Ячейка')" role="columnheader">📍 Ячейка <span class="sort-indicator">⬍</span></th>
+                            <th data-sort-col="ФИО" onclick="sortTable('ФИО')" role="columnheader">👤 ФИО (посл. опер.) <span class="sort-indicator">⬍</span></th>
+                            <th data-sort-col="Дата" onclick="sortTable('Дата')" role="columnheader">📅 Дата / Время (посл. опер.) <span class="sort-indicator">⬍</span></th>
+                            <th data-sort-col="Адрес-источник" onclick="sortTable('Адрес-источник')" role="columnheader">📤 Адрес-источник (посл. опер.) <span class="sort-indicator">⬍</span></th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+            <div class="pagination" id="pagination" role="navigation" aria-label="Пагинация"></div>
+        </div>
+
+        <div class="footer" data-service-footer data-title="Анализ Ротации Паллет" data-version-service="pallet_rotation"
+            data-app="Логистика Analytics" data-mail-subject="Pallet Rotation Tool"></div>
+    </div>
+	
+    <!-- === MODAL: Info === -->
+    <div class="modal-overlay" id="infoModal" role="dialog" aria-modal="true">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-header-left">
+                    <span class="modal-icon">📋</span>
+                    <h3 id="modalTitle">Информация и Инструкция</h3>
+                </div>
+                <button class="modal-close" onclick="toggleModal()" aria-label="Закрыть">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-body-inner">
+                    <div class="instruction-section">
+                        <h4>Как получить данные из WMS Navision</h4>
+                        <ol class="instruction-steps">
+                            <li><strong>Откройте WMS Navision</strong> Главное окно</li>
+                            <li><strong>Перейдите по ссылке</strong> Нажмите на ссылку <code>Паллеты</code></li>
+                            <li><strong>Выделите данные</strong> Нажмите на любое место в списке и выделите всё с помощью сочетания клавиш <code>Ctrl+A</code></li>
+                            <li><strong>Скопируйте данные</strong> Нажмите сочетание клавиш <code>Ctrl+Shift+C</code> и дождитесь завершения копирования</li>
+                            <li><strong>Выгрузите данные</strong> Создайте новый файл <code>Excel</code> и вставьте данные сочетанием кнопок <code>Ctrl+V</code></li>
+                            <li><strong>Сохраните файл</strong> Сохраните выгруженный файл в удобном месте на компьютере</li>
+                            <li><strong>Загрузите в инструмент</strong>Перетащите файл <code>Ваш_файл.xlsx</code> в область загрузки, либо вставьте нажатием на область загрузки через проводник</li>
+							<li><strong>Примените фильтры</strong>Отметьте если необходимо имеющиеся пункты для дополнительной фильтрации данных.</li>
+                        </ol>
+                    </div>
+                    <div class="info-cards">
+                        <div class="info-card">
+                            <div class="info-card-icon">💾</div>
+                            <div class="info-card-content">
+                                <h5>Сохранение данных</h5>
+                                <p>Данные хранятся локально в браузере (IndexedDB) до ручной очистки. При обновлении страницы данные сохраняются.</p>
+                            </div>
+                        </div>
+                        <div class="info-card">
+                            <div class="info-card-icon">📊</div>
+                            <div class="info-card-content">
+                                <h5>Аналитика</h5>
+                                <p>Автоматический расчёт срока хранения, определение паллет с нарушением ротации.</p>
+                            </div>
+                        </div>
+                        <div class="info-card">
+                            <div class="info-card-icon">📥</div>
+                            <div class="info-card-content">
+                                <h5>Экспорт</h5>
+                                <p>Выгрузка результатов в Excel с форматированием, условным форматированием и фильтрами.</p>
+                            </div>
+                        </div>
+                        <div class="info-card">
+                            <div class="info-card-icon">🔒</div>
+                            <div class="info-card-content">
+                                <h5>Безопасность</h5>
+                                <p>Все данные обрабатываются локально в вашем браузере и не передаются на внешние серверы.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="important-header">Важно знать</div>
+					<div class="warning-box">
+                        <p>Экспорт из <strong>WMS Navision</strong> не всегда корректно работает при выгрузке большого количества строк, поэтому для надёжности необходимо использовать стандартные средства буфера windows через принудительное копирование всех строк.</p>
+                    </div>
+                    <div class="warning-box">
+                        <p>Система обрабатывает паллеты по колонке <strong>«Хранение (дней)»</strong> из загруженного файла.</p>
+                    </div>
+					<div class="warning-box">
+						<p style="color: #78350F; margin-bottom: 15px;">
+                        Перед вставкой в таблицу необходимо отформатировать столбец где будут находиться sscc в текст, обычно это столбец <strong>E</strong>. Это необходимо чтобы внешние длинные sscc праильно отображались.
+                    </p>
+                    </div>
+                    <ul class="warning-list">
+                        <li><strong>🟢 Норма:</strong> до 15 дней хранения.</li>
+                        <li><strong>🟡 Внимание:</strong> 15-30 дней хранения.</li>
+                        <li><strong>🟠 Критично:</strong> 30-60 дней хранения. Требует немедленного внимания.</li>
+                        <li><strong>🔴 Очень критично:</strong> 60-90 дней хранения.</li>
+                        <li><strong>🟣 Критическое застояние:</strong> 90+ дней хранения.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    /* =====================================================
+       Сервис: Анализ Ротации Паллет - логика
+       Общее: shared/js/idb.js, shared/js/common.js
+       ===================================================== */
+
+    // === IndexedDB ===
+    const idb = new IDBStore({ dbName: 'lemanapro_pallet_rotation', storeName: 'kv', version: 1 });
+    const IDB_KEY = 'pallet_rotation_data';
+    const storage = createReportStorage({
+        idb,
+        key: IDB_KEY,
+        wrapped: true,
+    });
+
+    // === Global State ===
+    let palletData = [];
+    let filteredData = [];
+    let currentPage = 1;
+    const rowsPerPage = 50;
+    let charts = { age: null, dept: null, cell: null };
+    let sortColumn = null;
+    let sortDirection = false;
+    let isSessionOnly = false;
+
+    // Справочник отделов (код -> название)
+    const DEPARTMENTS = {
+        1: 'Стройматериалы',
+        2: 'Столярные изделия',
+        3: 'Электротовары',
+        4: 'Инструменты',
+        5: 'Напольные покрытия',
+        6: 'Плитка',
+        7: 'Сантехника',
+        8: 'Водоснабжение',
+        9: 'Сад',
+        10: 'Скобяные изделия',
+        11: 'Отделочные материалы',
+        12: 'Декор',
+        13: 'Освещение',
+        14: 'Хранения',
+        15: 'Кухни'
+    };
+
+    // === Initialization ===
+    document.addEventListener('DOMContentLoaded', async function() {
+        setupUploadArea('uploadArea', 'fileInput', handleFile);
+        setupFilters();
+        setupEscapeToClose('infoModal', toggleModal);
+        await loadSavedData();
+    });
+
+    // === Data Persistence (IndexedDB) ===
+    async function loadSavedData() {
+        try {
+            const payload = await storage.load();
+            if (payload && payload.records.length > 0) {
+                restoreData(payload.records, payload.timestamp);
+            }
+        } catch (e) {
+            console.error('Ошибка чтения из IndexedDB:', e);
+        }
+    }
+
+    function restoreData(records, timestamp) {
+        palletData = records;
+        filteredData = [...palletData];
+        isSessionOnly = false;
+        document.getElementById('sessionWarning').classList.remove('active');
+        updateNotice('saved', new Date(timestamp || Date.now()));
+        showUpload(false);
+        showDashboard(true);
+        document.querySelector('.filters-section').style.display = 'flex';
+        document.querySelector('.table-container').style.display = 'block';
+        document.getElementById('pagination').style.display = 'flex';
+        initializeDashboard();
+    }
+
+    function updateNotice(mode, date) {
+        document.getElementById('dataNotice').classList.add('active');
+        const title = document.getElementById('noticeTitle');
+        const info = document.getElementById('dataInfo');
+        if (title) title.textContent = mode === 'session' ? '⚠️ Режим сессии (без сохранения)!' : '💾 Данные сохранены!';
+        if (mode === 'session') {
+            info.innerHTML = `<strong>${palletData.length}</strong> паллет | Данные будут удалены при закрытии страницы`;
+        } else {
+            info.innerHTML = `<strong>${palletData.length}</strong> паллет | Дата: <strong>${date.toLocaleString('ru-RU')}</strong>`;
+        }
+    }
+
+    async function saveData() {
+        try {
+            const stamp = Date.now();
+            await storage.save(palletData, stamp);
+            isSessionOnly = false;
+            document.getElementById('sessionWarning').classList.remove('active');
+            updateNotice('saved', new Date(stamp));
+            return true;
+        } catch (error) {
+            console.error('Ошибка сохранения:', error);
+            isSessionOnly = true;
+            if (error.name === 'QuotaExceededError') {
+                document.getElementById('sessionWarning').classList.add('active');
+            }
+            updateNotice('session');
+            return false;
+        }
+    }
+
+    // === Clear with confirmation (IndexedDB deleteDB) ===
+    function doClearPalletRotation() {
+        storage.clear().then(() => {
+            document.getElementById('dataNotice').classList.remove('active');
+            document.getElementById('sessionWarning').classList.remove('active');
+            showUpload(true);
+            document.getElementById('dashboard').classList.remove('active');
+            document.querySelector('.filters-section').style.display = 'none';
+            document.querySelector('.table-container').style.display = 'none';
+            document.getElementById('pagination').style.display = 'none';
+
+            palletData = [];
+            filteredData = [];
+            currentPage = 1;
+            isSessionOnly = false;
+            sortColumn = null;
+            sortDirection = false;
+
+            document.getElementById('tableBody').innerHTML = '';
+            document.getElementById('statsGrid').innerHTML = '';
+            document.getElementById('ageChart').innerHTML = '';
+            document.getElementById('deptChart').innerHTML = '';
+            document.getElementById('cellChart').innerHTML = '';
+            const priorityCards = document.getElementById('priorityCards');
+            if (priorityCards) priorityCards.innerHTML = '';
+
+            document.getElementById('searchInput').value = '';
+            document.getElementById('departmentFilter').innerHTML = '<option value="">Все отделы</option>';
+            document.getElementById('ageFilter').value = '';
+            document.getElementById('ageRange').value = '0';
+            document.getElementById('ageRangeVal').textContent = '0';
+            document.getElementById('exclZdrop').checked = false;
+
+            updateSortIndicators();
+            destroyCharts(charts);
+
+        }).catch(e => {
+            console.error('Ошибка очистки IndexedDB:', e);
+            alert('Ошибка очистки данных: ' + e.message);
+        });
+    }
+
+    // === Upload Area ===
+    function setupFilters() {
+        document.getElementById('searchInput').addEventListener('input', applyFilters);
+        document.getElementById('departmentFilter').addEventListener('change', applyFilters);
+        document.getElementById('ageFilter').addEventListener('change', applyFilters);
+        document.getElementById('ageRange').addEventListener('input', function() {
+            document.getElementById('ageRangeVal').textContent = this.value;
+            applyFilters();
+        });
+        document.getElementById('exclZdrop').addEventListener('change', applyFilters);
+    }
+
+    /* ---------- Фильтры: взаимозависимые варианты ---------- */
+
+    // Проверяет один предмет Against всех фильтров, кроме указанного (для взаимозависимости селектов)
+    function matchItem(item, exclude) {
+        const search = document.getElementById('searchInput').value.trim().toLowerCase();
+        const dept = document.getElementById('departmentFilter').value;
+        const age = document.getElementById('ageFilter').value;
+        const range = parseInt(document.getElementById('ageRange').value || '0');
+        const exclZdrop = document.getElementById('exclZdrop').checked;
+        const days = item['Хранение (дней)'];
+
+        const cell = String(item['Ячейка'] || '').toLowerCase();
+        let matchSearch = !search || cell.includes(search);
+        let matchDept = !dept || String(item['Отдел Код'] || '') === dept;
+
+        let matchAge = true;
+        if (age) {
+            if (age === '0-15') matchAge = days !== null && days <= 15;
+            else if (age === '15-30') matchAge = days !== null && days > 15 && days <= 30;
+            else if (age === '30-60') matchAge = days !== null && days > 30 && days <= 60;
+            else if (age === '60-90') matchAge = days !== null && days > 60 && days <= 90;
+            else if (age === '90+') matchAge = days !== null && days > 90;
+            else if (age === 'no-date') matchAge = days === null;
+        }
+
+        let matchRange = true;
+        if (range > 0) {
+            matchRange = days !== null && days > range;
+        }
+
+        let matchZdrop = true;
+        if (exclZdrop) {
+            matchZdrop = !(item['z-drop'] === true);
+        }
+
+        if (exclude === 'search') matchSearch = true;
+        if (exclude === 'dept') matchDept = true;
+        if (exclude === 'age') matchAge = true;
+        if (exclude === 'range') matchRange = true;
+        if (exclude === 'zdrop') matchZdrop = true;
+
+        return matchSearch && matchDept && matchAge && matchRange && matchZdrop;
+    }
+
+    function applyFilters() {
+        // Фильтры влияют только на таблицу. Карточки и графики - общий срез по всем данным.
+        filteredData = palletData.filter(item => matchItem(item, null));
+        currentPage = 1;
+        updateFilters();
+        updateTable();
+    }
+
+    function resetFilters() {
+        document.getElementById('searchInput').value = '';
+        document.getElementById('departmentFilter').value = '';
+        document.getElementById('ageFilter').value = '';
+        document.getElementById('ageRange').value = '0';
+        document.getElementById('ageRangeVal').textContent = '0';
+        document.getElementById('exclZdrop').checked = false;
+        applyFilters();
+    }
+
+    function updateFilters() {
+        // Отделы: варианты берутся из данных, отфильтрованных ВСЕМИ кроме отдела (взаимозависимость)
+        const deptBase = palletData.filter(item => matchItem(item, 'dept'));
+        const depts = [...new Set(deptBase.map(i => i['Отдел Код']).filter(Boolean))].sort((a, b) => parseInt(a) - parseInt(b));
+
+        const deptSel = document.getElementById('departmentFilter');
+        if (deptSel) {
+            const currentVal = deptSel.value;
+            deptSel.innerHTML = '<option value="">Все отделы</option>' + depts.map(d =>
+                `<option value="${escapeHtml(d)}" ${d === currentVal ? 'selected' : ''}>${escapeHtml(d)} - ${escapeHtml(getDepartmentName(d))}</option>`
+            ).join('');
+        }
+    }
+
+    // === File Handling ===
+    function handleFile(file) {
+        if (!file.name.match(/\.(xlsx|xls)$/i)) {
+            alert('Загрузите файл .xlsx или .xls');
+            return;
+        }
+        document.getElementById('loading').classList.add('active');
+        document.getElementById('uploadSection').style.display = 'none';
+
+        parseXLSXFile(file).then(jsonData => {
+            palletData = parsePalletData(jsonData);
+            filteredData = [...palletData];
+            if (palletData.length === 0) throw new Error('Паллеты не найдены');
+            return saveData().then(() => {
+                document.getElementById('loading').classList.remove('active');
+                initializeDashboard();
+            });
+        }).catch(error => {
+            console.error('Ошибка:', error);
+            alert('Ошибка: ' + error.message);
+            document.getElementById('loading').classList.remove('active');
+            document.getElementById('uploadSection').style.display = 'block';
+        });
+    }
+
+    // === Data Parsing ===
+    function parsePalletData(jsonData) {
+        const data = [];
+        let headers = [];
+        let headerRowIndex = -1;
+
+        for (let i = 0; i < Math.min(jsonData.length, 50); i++) {
+            const row = jsonData[i] || [];
+            const rowText = row.join(' ').toLowerCase();
+            const hasPallet = rowText.includes('паллет');
+            const hasCell = rowText.includes('ячейк');
+            const hasStorage = rowText.includes('хранен');
+            // Не любые «код», а именно строка заголовков паллетного отчёта
+            if ((hasPallet && (hasCell || hasStorage)) || (hasCell && hasStorage)) {
+                headers = row.map(h => h ? String(h).trim() : '');
+                headerRowIndex = i;
+                break;
+            }
+        }
+        if (headerRowIndex === -1) throw new Error('Нет заголовков');
+        validateXLSXHeaders(jsonData, [
+            ['Код паллеты', 'Код паллета', 'Код паллет', 'Код'],
+            ['Отдел Код', 'Код отдела'],
+            'Описание',
+            ['Хранение (дней)', 'Срок хранения', 'Дней хранения'],
+            'Ячейка',
+            ['Посл. операция', 'Последняя операция', 'Последняя опер']
+        ], headerRowIndex);
+
+        const colMap = {
+            code: findColumnIndex(headers, ['Код паллеты', 'Код паллета', 'Код паллет', 'Код']),
+            deptCode: findColumnIndex(headers, ['Отдел Код', 'Отдел код', 'Код отдела']),
+            description: findColumnIndex(headers, ['Описание', 'Артикул', 'Товар']),
+            days: findColumnIndex(headers, ['Хранение (дней)', 'Хранение дней', 'Срок хранения', 'Дней хранения']),
+            cell: findColumnIndex(headers, ['Ячейка', 'Ячейка хранения', 'Адрес']),
+            lastOp: findColumnIndex(headers, ['Посл. операция', 'Последняя операция', 'Последняя опер', 'Операция'])
+        };
+
+        for (let i = headerRowIndex + 1; i < jsonData.length; i++) {
+            const row = jsonData[i] || [];
+            if (row.length < 3) continue;
+            if (row.every(cell => !cell || cell === '')) continue;
+
+            const code = cleanValue(colMap.code >= 0 ? row[colMap.code] : '');
+            if (!code) continue;
+
+            const deptCode = colMap.deptCode >= 0 ? normalizeDepartmentCode(row[colMap.deptCode]) : '';
+            const deptName = deptCode ? getDepartmentName(deptCode) : 'Не указан';
+            const description = cleanValue(colMap.description >= 0 ? row[colMap.description] : '');
+            const days = colMap.days >= 0 ? parseNullableNumber(row[colMap.days]) : null;
+            const cell = cleanValue(colMap.cell >= 0 ? row[colMap.cell] : '');
+            const lastOpRaw = colMap.lastOp >= 0 ? cleanValue(row[colMap.lastOp]) : '';
+
+            // Парсинг "Посл. операция": РК000->PRA070 16.09.26 13:30 (ФИО)
+            let opFrom = '';
+            let opDate = '';
+            let opTime = '';
+            let opFio = '';
+            if (lastOpRaw) {
+                const opMatch = lastOpRaw.match(/^([^>]+)->([^\s]+)\s+(\d{2}\.\d{2}\.\d{2})\s+(\d{1,2}:\d{1,2})\s*\(([^)]*)\)$/);
+                if (opMatch) {
+                    opFrom = opMatch[1].trim();
+                    opDate = opMatch[3];
+                    opTime = opMatch[4];
+                    opFio = opMatch[5].trim();
+                } else {
+                    const opMatch2 = lastOpRaw.match(/^([^\s]+)\s+(\d{2}\.\d{2}\.\d{2})\s+(\d{1,2}:\d{1,2})\s*\(([^)]*)\)$/);
+                    if (opMatch2) {
+                        opFrom = opMatch2[1].trim();
+                        opDate = opMatch2[2];
+                        opTime = opMatch2[3];
+                        opFio = opMatch2[4].trim();
+                    } else {
+                        opFrom = lastOpRaw;
+                    }
+                }
+            }
+
+            data.push({
+                'Код паллеты': code,
+                'Отдел Код': deptCode,
+                'Отдел': deptName,
+                'Описание': description,
+                'Хранение (дней)': days,
+                'Ячейка': cell,
+                'ФИО': opFio,
+                'Дата': opDate,
+                'Время': opTime,
+                'Адрес-источник': opFrom,
+                'Посл. операция raw': lastOpRaw,
+                'z-drop': String(cell || '').toUpperCase().includes('Z-DROP') || String(code || '').toUpperCase().includes('Z-DROP') || String(description || '').toUpperCase().includes('Z-DROP')
+            });
+        }
+
+        // Сортировка по сроку хранения (убывание)
+        data.sort((a, b) => {
+            const da = a['Хранение (дней)'] === null ? -1 : a['Хранение (дней)'];
+            const db = b['Хранение (дней)'] === null ? -1 : b['Хранение (дней)'];
+            return db - da;
+        });
+
+        return data;
+    }
+
+    function getDepartmentName(code) {
+        const num = parseInt(code);
+        return DEPARTMENTS[num] || `Отдел ${code}`;
+    }
+
+    // Код отдела в файле бывает и числом, и строкой («3», «3.0», 3).
+    // Приводим к целому строковому виду, чтобы фильтр и группировка совпадали.
+    function normalizeDepartmentCode(val) {
+        if (val === null || val === undefined) return '';
+        const str = String(val).trim();
+        if (!str) return '';
+        const num = Number(str.replace(',', '.'));
+        return Number.isFinite(num) ? String(Math.trunc(num)) : str;
+    }
+
+    // Дата и время последней операции для корректной сортировки
+    function getOperationTimestamp(item) {
+        const date = parseDateCell(item['Дата']);
+        if (!date) return null;
+        const minutes = parseTimeCell(item['Время']);
+        return date.getTime() + (minutes === null ? 0 : minutes * 60000);
+    }
+
+    // === Dashboard ===
+    function initializeDashboard() {
+        showDashboard(true);
+        showLoading(false);
+        // Показать секции (требуется и при загрузке файла, и при восстановлении)
+        document.querySelector('.filters-section').style.display = 'flex';
+        document.querySelector('.table-container').style.display = 'block';
+        document.getElementById('pagination').style.display = 'flex';
+        // Применяем сохранённые фильтры к таблице; статистика и графики - по всему отчёту
+        applyFilters();
+        updateStats();
+        updateCharts();
+        updateTopPalletCards();
+    }
+
+    // === Stats ===
+    function updateStats() {
+        // Статистика - общий срез по всему отчёту, фильтры на неё не влияют
+        const source = palletData;
+        const total = source.length;
+        const critical = source.filter(i => i['Хранение (дней)'] !== null && i['Хранение (дней)'] > 30).length;
+        const warning = source.filter(i => i['Хранение (дней)'] !== null && i['Хранение (дней)'] > 15 && i['Хранение (дней)'] <= 30).length;
+        const normal = source.filter(i => i['Хранение (дней)'] !== null && i['Хранение (дней)'] <= 15).length;
+        const noDate = source.filter(i => i['Хранение (дней)'] === null).length;
+
+        const daysWithValue = source.filter(i => i['Хранение (дней)'] !== null).map(i => i['Хранение (дней)']);
+        const avgDays = daysWithValue.length > 0 ? Math.round(daysWithValue.reduce((a, b) => a + b, 0) / daysWithValue.length) : 0;
+        const maxDays = daysWithValue.length > 0 ? Math.max(...daysWithValue) : 0;
+
+        document.getElementById('statsGrid').innerHTML = `
+            <div class="stat-card pallet-info"><div class="stat-value">${total}</div><div class="stat-label">Всего паллет</div></div>
+            <div class="stat-card pallet-critical"><div class="stat-value critical">${critical}</div><div class="stat-label">Критично (&gt;30 дней)</div></div>
+            <div class="stat-card pallet-warning"><div class="stat-value warning">${warning}</div><div class="stat-label">Внимание (15-30 дн)</div></div>
+            <div class="stat-card pallet-normal"><div class="stat-value normal">${normal}</div><div class="stat-label">Норма (&lt;15 дн)</div></div>
+            <div class="stat-card pallet-no-data"><div class="stat-value">${noDate}</div><div class="stat-label">Без даты</div></div>
+            <div class="stat-card pallet-info"><div class="stat-value">${avgDays}</div><div class="stat-label">Средний срок (дн)</div></div>
+            <div class="stat-card pallet-critical"><div class="stat-value critical">${maxDays}</div><div class="stat-label">Макс. срок (дн)</div></div>
+        `;
+    }
+
+    // === Топ-10 паллет по сроку хранения ===
+    function updateTopPalletCards() {
+        const container = document.getElementById('priorityCards');
+        if (!container) return;
+        const items = palletData
+            .filter(i => typeof i['Хранение (дней)'] === 'number' && Number.isFinite(i['Хранение (дней)']))
+            .slice()
+            .sort((a, b) => b['Хранение (дней)'] - a['Хранение (дней)'])
+            .slice(0, 10);
+
+        if (items.length === 0) {
+            container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 30px; color: #6B7280;">Нет паллет с указанным сроком хранения</div>';
+            return;
+        }
+        container.innerHTML = items.map((item, index) => {
+            const days = item['Хранение (дней)'];
+            const code = item['Код паллеты'] || item['Код паллета'] || item['Код'] || '-';
+            const description = item['Описание'] || '';
+            const descriptionShort = description.length > 40 ? description.slice(0, 40) + '...' : description;
+            const dept = item['Отдел Код'];
+            const deptName = getDepartmentName ? getDepartmentName(dept) : '';
+            const cell = item['Ячейка'] || '-';
+            return `
+                <div class="top-card">
+                    <div class="top-card-header">
+                        <span class="priority-rank">${index + 1}</span>
+                        <span class="priority-lm">${escapeHtml(String(code))}</span>
+                    </div>
+                    <div class="priority-name" title="${escapeHtml(description)}">${escapeHtml(descriptionShort || '-')}</div>
+                    <div class="priority-stats">
+                        <span class="priority-qty">📍 ${escapeHtml(String(cell))}</span>
+                        <span class="priority-dept">Отдел ${escapeHtml(String(dept ?? '-'))}</span>
+                    </div>
+                    <div class="priority-days">${days} дн. хранения</div>
+                    <div class="priority-zone">${escapeHtml(deptName || '-')}</div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // === Charts ===
+    function updateCharts() {
+        destroyCharts(charts);
+
+        // Все графики строятся по полному отчёту, фильтры на них не влияют
+        const source = palletData;
+
+        // 1. Возрастная гистограмма
+        const ageData = {
+            '0-15': source.filter(i => i['Хранение (дней)'] !== null && i['Хранение (дней)'] <= 15).length,
+            '15-30': source.filter(i => i['Хранение (дней)'] !== null && i['Хранение (дней)'] > 15 && i['Хранение (дней)'] <= 30).length,
+            '30-60': source.filter(i => i['Хранение (дней)'] !== null && i['Хранение (дней)'] > 30 && i['Хранение (дней)'] <= 60).length,
+            '60-90': source.filter(i => i['Хранение (дней)'] !== null && i['Хранение (дней)'] > 60 && i['Хранение (дней)'] <= 90).length,
+            '90+': source.filter(i => i['Хранение (дней)'] !== null && i['Хранение (дней)'] > 90).length,
+            'Без даты': source.filter(i => i['Хранение (дней)'] === null).length
+        };
+
+        const ageCtx = document.getElementById('ageChart').getContext('2d');
+        charts.age = new Chart(ageCtx, {
+            type: 'bar',
+            data: {
+                labels: Object.keys(ageData),
+                datasets: [{
+                    label: 'Количество паллет',
+                    data: Object.values(ageData),
+                    backgroundColor: ['#10B981', '#F59E0B', '#E04B00', '#B45309', '#7F1D1D', '#9CA3AF']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false }, title: { display: false } },
+                scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+            }
+        });
+
+        // 2. Топ отделов по критичным (>30 дней) - круговая диаграмма
+        const deptCounts = {};
+        source.forEach(i => {
+            if (i['Хранение (дней)'] !== null && i['Хранение (дней)'] > 30) {
+                deptCounts[i['Отдел']] = (deptCounts[i['Отдел']] || 0) + 1;
+            }
+        });
+        const deptSorted = Object.entries(deptCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
+        const deptCtx = document.getElementById('deptChart').getContext('2d');
+        charts.dept = new Chart(deptCtx, {
+            type: 'pie',
+            data: {
+                labels: deptSorted.map(d => d[0]),
+                datasets: [{
+                    label: 'Критичных паллет',
+                    data: deptSorted.map(d => d[1]),
+                    backgroundColor: [
+                        '#B45309', '#D97706', '#E04B00', '#7F1D1D', '#92400E',
+                        '#B45309', '#D97706', '#E04B00', '#7F1D1D', '#92400E'
+                    ],
+                    borderColor: '#ffffff',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: true, position: 'right', labels: { font: { size: 11 } } },
+                    title: { display: false }
+                }
+            }
+        });
+
+        // 3. Топ ячеек по сроку хранения
+        const cellCounts = {};
+        source.forEach(i => {
+            if (i['Хранение (дней)'] !== null && i['Хранение (дней)'] > 30) {
+                cellCounts[i['Ячейка']] = (cellCounts[i['Ячейка']] || 0) + 1;
+            }
+        });
+        const cellSorted = Object.entries(cellCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
+        const cellCtx = document.getElementById('cellChart').getContext('2d');
+        charts.cell = new Chart(cellCtx, {
+            type: 'bar',
+            data: {
+                labels: cellSorted.map(c => c[0]),
+                datasets: [{
+                    label: 'Критичных паллет',
+                    data: cellSorted.map(c => c[1]),
+                    backgroundColor: '#E04B00'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                plugins: { legend: { display: false } },
+                scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } }
+            }
+        });
+    }
+
+    // === Table rendering ===
+    function updateTable() {
+        const tbody = document.getElementById('tableBody');
+        if (!tbody) {
+            console.error('tableBody not found');
+            return;
+        }
+        tbody.innerHTML = '';
+
+        if (!filteredData || filteredData.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #9ca3af;">Нет данных</td></tr>';
+            updatePagination('pagination', 0, 1, 'changePage');
+            return;
+        }
+
+        const start = (currentPage - 1) * rowsPerPage;
+        const pageData = filteredData.slice(start, start + rowsPerPage);
+
+        if (pageData.length === 0) {
+            currentPage = Math.max(1, currentPage - 1);
+            return updateTable();
+        }
+
+        try {
+            pageData.forEach((item, index) => {
+                const days = item['Хранение (дней)'];
+                let daysClass = 'pallet-normal-badge';
+                let daysText = days === null ? 'Нет даты' : days + ' дн.';
+                if (days === null) {
+                    daysClass = 'pallet-no-data-badge';
+                } else if (days <= 15) {
+                    daysClass = 'pallet-normal-badge';
+                } else if (days <= 30) {
+                    daysClass = 'pallet-warning-badge';
+                } else {
+                    daysClass = 'pallet-critical-badge';
+                }
+
+                const dateTime = (item['Дата'] || '') + (item['Время'] ? ' ' + item['Время'] : '');
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${escapeHtml(String(item['Код паллеты'] || ''))}</strong></td>
+                    <td>${escapeHtml(String(item['Отдел'] || ''))}</td>
+                    <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(String(item['Описание'] || ''))}">${escapeHtml(String(item['Описание'] || ''))}</td>
+                    <td><span class="pallet-badge ${daysClass}">${escapeHtml(daysText)}</span></td>
+                    <td>${escapeHtml(String(item['Ячейка'] || ''))}</td>
+                    <td>${escapeHtml(String(item['ФИО'] || ''))}</td>
+                    <td style="max-width: 160px; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(dateTime)}">${escapeHtml(dateTime)}</td>
+                    <td style="max-width: 120px; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(String(item['Адрес-источник'] || ''))}">${escapeHtml(String(item['Адрес-источник'] || ''))}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (e) {
+            console.error('Ошибка отрисовки таблицы:', e);
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #e53e3e;">Ошибка отрисовки таблицы</td></tr>';
+        }
+
+        enableSingleRowSelection(tbody);
+
+        updatePagination('pagination', Math.ceil(filteredData.length / rowsPerPage), currentPage, 'changePage');
+    }
+
+    // === Sorting ===
+    function sortTable(col) {
+        if (sortColumn === col) { sortDirection = !sortDirection; } else {
+            sortColumn = col;
+            sortDirection = false;
+        }
+        filteredData.sort((a, b) => {
+            let va, vb;
+            if (col === 'Дата') {
+                const ta = getOperationTimestamp(a);
+                const tb = getOperationTimestamp(b);
+                va = ta === null ? -1 : ta;
+                vb = tb === null ? -1 : tb;
+            } else if (col === 'Хранение (дней)') {
+                va = a[col] === null ? -1 : a[col];
+                vb = b[col] === null ? -1 : b[col];
+            } else {
+                va = a[col] || '';
+                vb = b[col] || '';
+            }
+            const na = parseFloat(va);
+            const nb = parseFloat(vb);
+            if (!isNaN(na) && !isNaN(nb) && String(va).trim() !== '' && String(vb).trim() !== '') { va = na; vb = nb; }
+            if (va === vb) return 0;
+            return sortDirection ? (va > vb ? -1 : 1) : (va < vb ? -1 : 1);
+        });
+        updateTable();
+        updateSortIndicators(sortColumn, sortDirection);
+    }
+
+    // === Pagination ===
+    function changePage(page) {
+        const totalPages = Math.ceil(filteredData.length / rowsPerPage);
+        if (page < 1 || page > totalPages) return;
+        currentPage = page;
+        updateTable();
+    }
+
+    // === Export ===
+    function exportToXLSX() {
+        if (filteredData.length === 0) { alert('Нет данных для экспорта'); return; }
+        const wsData = [
+            ['Код паллеты', 'Отдел', 'Описание', 'Хранение (дней)', 'Ячейка', 'ФИО', 'Дата / Время', 'Адрес-источник']
+        ];
+        filteredData.forEach(item => {
+            const dateTime = (item['Дата'] || '') + (item['Время'] ? ' ' + item['Время'] : '');
+            wsData.push([
+                item['Код паллеты'],
+                item['Отдел'],
+                item['Описание'],
+                item['Хранение (дней)'] === null ? '' : item['Хранение (дней)'],
+                item['Ячейка'],
+                item['ФИО'],
+                dateTime,
+                item['Адрес-источник']
+            ]);
+        });
+        const ws = XLSX.utils.aoa_to_sheet(wsData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Паллеты');
+        const dateStr = new Date().toISOString().slice(0, 10);
+        const timeStr = new Date().toTimeString().slice(0, 5).replace(':', '-');
+        XLSX.writeFile(wb, `паллеты_ротация_${dateStr}_${timeStr}.xlsx`);
+    }
+
+    // === Modal ===
+    function toggleModal() {
+        const modal = document.getElementById('infoModal');
+        if (modal) modal.classList.toggle('active');
+        if (modal && modal.classList.contains('active')) {
+            const close = modal.querySelector('.modal-close');
+            if (close) close.focus();
+        }
+    }
+    const infoModal = document.getElementById('infoModal');
+    if (infoModal) {
+        infoModal.addEventListener('click', function(e) {
+            if (e.target === this) toggleModal();
+        });
+    }
+
+    // === Глобальный перехват ошибок ===
+    window.addEventListener('error', (e) => {
+        console.error('[Портал Ротации] Глобальная ошибка JS:', e.message,
+            e.filename ? `(${e.filename}:${e.lineno}:${e.colno})` : '');
+        if (e.error) { console.error(e.error); }
+    });
+    window.addEventListener('unhandledrejection', (e) => {
+        console.error('[Портал Ротации] Необработанный промис:', e.reason);
+    });
+    </script>
+</body>
+</html>
