@@ -7,8 +7,8 @@
    ===================================================== */
 
 self.PORTAL_CONFIG = Object.freeze({
-    version: '1.0.7',
-    releaseDate: '27.11.2026',
+    version: '1.0.8',
+    releaseDate: '28.11.2026',
     services: Object.freeze([
         Object.freeze({
             id: 'avs',
@@ -57,7 +57,7 @@ self.PORTAL_CONFIG = Object.freeze({
         Object.freeze({
             id: 'corrections',
             title: 'Анализ Коррекций',
-            version: '1.0.0',
+            version: '1.0.1',
             icon: '🧾',
             url: 'Services/corrections/index.html',
             desc: 'Анализ списаний под разными кодами аналитики, учёта инвентаризаций и выявление аномалий в проведённых ведомостях.',
@@ -101,7 +101,7 @@ self.PORTAL_CONFIG = Object.freeze({
         Object.freeze({
             id: 'analyse_logistic_operation',
             title: 'Аналитика логистических операций',
-            version: '1.0.6',
+            version: '1.0.7',
             icon: '📈',
             url: 'Services/analyseLogisticOperation/index.html',
             desc: 'Динамика операций по дням и часам, продуктивность по паллетам и штукам SKU, КПД, топ-10, доли по категориям и контекстам.',

@@ -243,6 +243,10 @@ test('analyseLogisticOperation: вкладка сотрудников без с�
 test('analyseLogisticOperation: единый период и раздельные фильтры', () => {
     assert.ok(serviceHtml.includes('id="periodFrom"'));
     assert.ok(serviceHtml.includes('id="periodTo"'));
+    assert.ok(serviceHtml.includes('function anaSelectPeriodDate'), 'нет выбора дня кликом по гистограмме периода');
+    assert.ok(serviceHtml.includes('anaSelectPeriodDate(bar.dataset.idx)'), 'клик по столбцу периода не подключён');
+    assert.ok(serviceHtml.includes('role="button" tabindex="0"'), 'столбцы периода недоступны с клавиатуры');
+    assert.ok(serviceHtml.includes('function anaPeriodLabel'), 'нет единой подписи периода');
     assert.ok(serviceHtml.includes('anaSetChartFilter'));
     assert.ok(serviceHtml.includes('anaSetTableFilter'));
     assert.ok(serviceHtml.includes("anaFilterSelect('🗂️ Категория'"), 'нет фильтра категорий в таблице');

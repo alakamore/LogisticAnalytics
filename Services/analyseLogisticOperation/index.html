@@ -247,8 +247,8 @@
             min-width: 2px;
             border-radius: 3px 3px 0 0;
             background: #dbe7e4;
-            transition: background 0.15s, transform 0.15s;
-            cursor: help;
+            transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
+            cursor: pointer;
         }
 
         .period-bar.in-range {
@@ -257,6 +257,15 @@
 
         .period-bar:hover {
             transform: scaleY(1.06);
+        }
+
+        .period-bar:focus-visible {
+            outline: 2px solid var(--accent-2);
+            outline-offset: 2px;
+        }
+
+        .period-bar.selected {
+            box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--accent-2);
         }
 
         .period-sliders {
@@ -2225,6 +2234,7 @@
                     <h4>🔎 Фильтры и правила</h4>
                     <ul>
                         <li><b>Период</b> сверху действует на все вкладки, графики, карточки и таблицы.</li>
+                        <li>Клик по столбцу гистограммы периода выбирает один день; ползунки и кнопки-пресеты задают диапазон.</li>
                         <li><b>Фильтры графиков</b> и <b>фильтры таблицы</b> независимы друг от друга.</li>
                         <li>Доступны фильтры: контекст, тип подразделения, подразделение, должность, категория и операция; в таблице также поиск. Списки сужаются под остальные фильтры.</li>
                         <li>При переходе на другую вкладку фильтры сбрасываются.</li>
@@ -2441,6 +2451,12 @@
         function anaFmtDate(iso) {
             const p = String(iso || '').split('-');
             return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : String(iso || '-');
+        }
+        function anaPeriodLabel() {
+            if (!anaDates.length) return '-';
+            const from = anaDates[anaPeriod.from];
+            const to = anaDates[anaPeriod.to];
+            return from === to ? anaFmtDate(from) : `${anaFmtDate(from)} - ${anaFmtDate(to)}`;
         }
         function anaFmtDateShort(iso) {
             const p = String(iso || '').split('-');
@@ -2827,9 +2843,27 @@
                 return s ? s.ops : 0;
             });
             const max = Math.max(1, ...counts);
-            hist.innerHTML = counts.map((v, i) =>
-                `<div class="period-bar" data-idx="${i}" style="height:${Math.max(6, Math.round(v / max * 100))}%" title="${anaAttr(anaFmtDate(anaDates[i]))}: ${anaFmtInt(v)} операций"></div>`
-            ).join('');
+            hist.innerHTML = counts.map((v, i) => {
+                const date = anaFmtDate(anaDates[i]);
+                const ops = anaFmtInt(v);
+                return `<div class="period-bar" data-idx="${i}" role="button" tabindex="0"
+                    style="height:${Math.max(6, Math.round(v / max * 100))}%"
+                    title="${anaAttr(date)}: ${ops} операций · нажмите, чтобы выбрать день"
+                    aria-label="${anaAttr(date)}: ${ops} операций. Выбрать день"></div>`;
+            }).join('');
+            /* Клик по столбцу выбирает один день: период и все карточки
+               пересчитываются на эту дату. */
+            hist.onclick = e => {
+                const bar = e.target.closest('.period-bar');
+                if (bar) anaSelectPeriodDate(bar.dataset.idx);
+            };
+            hist.onkeydown = e => {
+                if (e.key !== 'Enter' && e.key !== ' ') return;
+                const bar = e.target.closest('.period-bar');
+                if (!bar) return;
+                e.preventDefault();
+                anaSelectPeriodDate(bar.dataset.idx);
+            };
         }
 
         function anaUpdatePeriodUI() {
@@ -2838,10 +2872,9 @@
             const toEl = document.getElementById('periodTo');
             if (fromEl) { fromEl.min = 0; fromEl.max = anaDates.length - 1; fromEl.value = anaPeriod.from; }
             if (toEl) { toEl.min = 0; toEl.max = anaDates.length - 1; toEl.value = anaPeriod.to; }
-            const fromDate = anaDates[anaPeriod.from];
-            const toDate = anaDates[anaPeriod.to];
+            const singleDay = anaPeriod.from === anaPeriod.to;
             const label = document.getElementById('periodRangeLabel');
-            if (label) label.textContent = `${anaFmtDate(fromDate)} - ${anaFmtDate(toDate)}`;
+            if (label) label.textContent = anaPeriodLabel();
             const sf = document.getElementById('periodScaleFrom');
             const st = document.getElementById('periodScaleTo');
             if (sf) sf.textContent = anaFmtDate(anaDates[0]);
@@ -2860,7 +2893,10 @@
             }
             document.querySelectorAll('#periodHist .period-bar').forEach(bar => {
                 const idx = Number(bar.dataset.idx);
+                const selected = singleDay && idx === anaPeriod.from;
                 bar.classList.toggle('in-range', idx >= anaPeriod.from && idx <= anaPeriod.to);
+                bar.classList.toggle('selected', selected);
+                bar.setAttribute('aria-pressed', String(selected));
             });
             const span = anaPeriod.to - anaPeriod.from + 1;
             const atEnd = anaPeriod.to === anaDates.length - 1;
@@ -2902,6 +2938,14 @@
                 from = Math.max(0, to - n + 1);
             }
             anaPeriod = { from, to };
+            anaApplyPeriodNow();
+        }
+
+        /* Выбор одного дня кликом по гистограмме периода. */
+        function anaSelectPeriodDate(idx) {
+            if (!anaDates.length) return;
+            const i = Math.max(0, Math.min(anaDates.length - 1, parseInt(idx, 10) || 0));
+            anaPeriod = { from: i, to: i };
             anaApplyPeriodNow();
         }
 
@@ -3656,7 +3700,7 @@
                 const daysCount = Math.max(1, anaPeriod.to - anaPeriod.from + 1);
                 const peak = days.slice().sort((a, b) => b.ops - a.ops)[0];
                 cards.push(
-                    anaStatCard(anaFmtInt(daysCount), 'Дней в периоде', anaFmtDate(anaDates[anaPeriod.from]) + ' - ' + anaFmtDate(anaDates[anaPeriod.to]), 'var(--chart-1)'),
+                    anaStatCard(anaFmtInt(daysCount), 'Дней в периоде', anaPeriodLabel(), 'var(--chart-1)'),
                     anaStatCard(anaFmtInt(t.ops), 'Всего операций', `в среднем ${anaFmt(t.ops / daysCount)} в день`, 'var(--chart-2)'),
                     anaStatCard(anaFmt(t.qty), 'Кол-во штук', `в среднем ${anaFmt(t.qty / daysCount)} в день`, 'var(--chart-4)'),
                     anaStatCard(anaFmt(t.w), 'Взвешенные операции', 'с учётом трудоёмкости', 'var(--chart-3)'),
@@ -4685,7 +4729,7 @@
                     d.slots, Number(d.avgPerSlot.toFixed(2)), Number(d.kpd.toFixed(2)),
                 ]);
             }
-            const period = `${anaFmtDate(anaDates[anaPeriod.from])} - ${anaFmtDate(anaDates[anaPeriod.to])}`;
+            const period = anaPeriodLabel();
             exportRowsToXLSX([
                 ['Аналитика логистических операций', tab.label],
                 ['Период', period],
@@ -4842,7 +4886,7 @@
             const share = deptW ? e.w / deptW * 100 : 0;
             document.getElementById('profileSummary').innerHTML = `<div class="info-section" style="margin:0">
                 <h4>📌 Итоги по сотруднику</h4>
-                <p>Период: <b>${anaFmtDate(anaDates[anaPeriod.from])} - ${anaFmtDate(anaDates[anaPeriod.to])}</b>. Активных дней: <b>${e.days}</b> из ${dates.length}. Среднее за активный день: <b>${anaFmt(e.ops / Math.max(1, e.days))}</b> операций. КПД: <b>${anaFmt2(e.kpd)}</b> взвешенных операций на активный 10-минутный слот. Вклад в операции подразделения: <b>${anaFmt2(share)}%</b> по трудоёмкости.</p>
+                <p>Период: <b>${anaPeriodLabel()}</b>. Активных дней: <b>${e.days}</b> из ${dates.length}. Среднее за активный день: <b>${anaFmt(e.ops / Math.max(1, e.days))}</b> операций. КПД: <b>${anaFmt2(e.kpd)}</b> взвешенных операций на активный 10-минутный слот. Вклад в операции подразделения: <b>${anaFmt2(share)}%</b> по трудоёмкости.</p>
             </div>`;
 
             /* Ширина скроллбара до блокировки прокрутки: добавляем её к уже

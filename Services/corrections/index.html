@@ -70,7 +70,10 @@
             background: var(--container-bg);
             border-radius: 16px;
             box-shadow: 0 10px 40px var(--shadow-color);
-            overflow: hidden;
+            /* overflow:hidden превращает контейнер в scroll-container и ломает
+               position:sticky у блока периода. Углы шапки и подвала скругляем
+               отдельно, чтобы карточка сохранила прежний вид. */
+            overflow: visible;
             display: flex;
             flex-direction: column;
             min-height: calc(100vh - 50px);
@@ -85,6 +88,8 @@
             justify-content: space-between;
             align-items: center;
             position: relative;
+            border-top-left-radius: 16px;
+            border-top-right-radius: 16px;
             border-bottom: 4px solid var(--brand-gold);
         }
         .header-left h1 { font-size: 1.7em; font-weight: 700; }
@@ -244,12 +249,15 @@
         }
         /* --- Period filter --- */
         .period-panel {
+            position: sticky;
+            top: 0;
+            z-index: 40;
             margin-bottom: 14px;
             padding: 11px 14px 9px;
             background: var(--card-bg);
             border: 1px solid var(--card-border);
             border-radius: 12px;
-            box-shadow: 0 3px 12px var(--shadow-color);
+            box-shadow: 0 6px 18px var(--shadow-color);
         }
         .period-top {
             display: flex;
@@ -1047,6 +1055,8 @@
         .footer {
             background: var(--footer-bg);
             border-top: 1px solid var(--footer-border);
+            border-bottom-left-radius: 16px;
+            border-bottom-right-radius: 16px;
             padding: 20px 35px;
             text-align: center;
             color: var(--text-muted);
